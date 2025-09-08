@@ -4,6 +4,9 @@ import { ArrowRight, Play, Sparkles, Zap } from "lucide-react";
 import heroBg from "@/assets/hero-bg.jpg";
 
 const HeroSection = () => {
+  const [isDemoOpen, setIsDemoOpen] = useState(false);
+  const [isLoginOpen, setIsLoginOpen] = useState(false);
+  const navigate = useNavigate();
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
       {/* Background */}
