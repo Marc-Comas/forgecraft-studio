@@ -99,32 +99,25 @@ Please enhance the code according to the user's request while maintaining existi
 CRITICAL REQUIREMENTS:
 - Generate a COMPLETE, FUNCTIONAL HTML page with embedded CSS and JavaScript
 - Use Tailwind CSS via CDN (https://cdn.tailwindcss.com)
-- Implement responsive design that works perfectly on mobile, tablet, and desktop
-- Include interactive JavaScript features where appropriate
+- Implement responsive design that works on mobile and desktop
 - Use semantic HTML5 elements for accessibility
 - Add proper meta tags for SEO
-- Create visually stunning designs with professional styling
-- Use modern color schemes and typography
+- Create professional styling with modern design
 - Add smooth transitions and hover effects
 
 TECHNICAL SPECIFICATIONS:
 - Use Tailwind CSS classes for styling
-- Embed custom CSS in <style> tags only when absolutely necessary
-- Embed ALL JavaScript in <script> tags before closing </body>
+- Embed custom CSS in <style> tags only when necessary
+- Embed JavaScript in <script> tags before closing </body>
 - Use CSS Grid and Flexbox (via Tailwind) for layouts
 - Implement mobile-first responsive design
 - Add proper viewport meta tag
-- Include favicon and meta descriptions
-- Use modern CSS features (custom properties, clamp(), etc.)
 
 STRUCTURE REQUIREMENTS:
 - Navigation with logo and menu items
-- Hero section with compelling headline and CTA
+- Hero section with headline and CTA
 - Features/Services section
-- Gallery/Portfolio/Products section (depending on type)
-- Pricing section (for business/SaaS)
-- FAQ section
-- Contact form with proper validation
+- Contact form with validation
 - Footer with links and company info
 
 RESPONSE FORMAT:
@@ -149,7 +142,7 @@ IMPORTANT: Return ONLY the JSON object, no markdown formatting or additional tex
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt }
       ],
-      max_completion_tokens: 15000,
+      max_completion_tokens: 8000,
     };
 
     console.log('📤 Sending request to OpenAI API...');
