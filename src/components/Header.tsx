@@ -1,10 +1,14 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Code, Menu, X, Zap } from "lucide-react";
+import AuthModal from "./auth/AuthModal";
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
 
   const navItems = [
     { label: "Dashboard", href: "/dashboard" },
@@ -22,39 +26,58 @@ const Header = () => {
       <div className="container mx-auto px-6 py-4">
         <div className="flex items-center justify-between">
           {/* Logo */}
-          <motion.div
-            className="flex items-center space-x-2"
-            whileHover={{ scale: 1.05 }}
-          >
-            <div className="p-2 bg-gradient-primary rounded-lg">
-              <Code className="w-6 h-6 text-primary-foreground" />
-            </div>
-            <span className="text-xl font-heading font-bold text-gradient-primary">
-              SiteForge Studio
-            </span>
-          </motion.div>
+          <Link to="/">
+            <motion.div
+              className="flex items-center space-x-2"
+              whileHover={{ scale: 1.05 }}
+            >
+              <div className="p-2 bg-gradient-primary rounded-lg">
+                <Code className="w-6 h-6 text-primary-foreground" />
+              </div>
+              <span className="text-xl font-heading font-bold text-gradient-primary">
+                SiteForge Studio
+              </span>
+            </motion.div>
+          </Link>
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center space-x-8">
             {navItems.map((item, index) => (
-              <motion.a
+              <motion.div
                 key={item.label}
-                href={item.href}
-                className="text-muted-foreground hover:text-foreground transition-colors"
                 whileHover={{ y: -2 }}
                 transition={{ delay: index * 0.1 }}
               >
-                {item.label}
-              </motion.a>
+                <Link
+                  to={item.href}
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {item.label}
+                </Link>
+              </motion.div>
             ))}
           </nav>
 
           {/* CTA Buttons */}
           <div className="hidden md:flex items-center space-x-4">
-            <Button variant="ghost" size="sm">
+            <Button 
+              variant="ghost" 
+              size="sm"
+              onClick={() => {
+                setAuthMode('signin');
+                setShowAuthModal(true);
+              }}
+            >
               Sign In
             </Button>
-            <Button className="btn-cyber" size="sm">
+            <Button 
+              className="btn-cyber" 
+              size="sm"
+              onClick={() => {
+                setAuthMode('signup');
+                setShowAuthModal(true);
+              }}
+            >
               <Zap className="w-4 h-4 mr-2" />
               Start Building
             </Button>
@@ -81,19 +104,34 @@ const Header = () => {
           >
             <nav className="flex flex-col space-y-4 mt-4">
               {navItems.map((item) => (
-                <a
+                <Link
                   key={item.label}
-                  href={item.href}
+                  to={item.href}
                   className="text-muted-foreground hover:text-foreground transition-colors"
+                  onClick={() => setIsMenuOpen(false)}
                 >
                   {item.label}
-                </a>
+                </Link>
               ))}
               <div className="flex flex-col space-y-2 pt-4 border-t border-border">
-                <Button variant="ghost" size="sm">
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={() => {
+                    setAuthMode('signin');
+                    setShowAuthModal(true);
+                  }}
+                >
                   Sign In
                 </Button>
-                <Button className="btn-cyber" size="sm">
+                <Button 
+                  className="btn-cyber" 
+                  size="sm"
+                  onClick={() => {
+                    setAuthMode('signup');
+                    setShowAuthModal(true);
+                  }}
+                >
                   <Zap className="w-4 h-4 mr-2" />
                   Start Building
                 </Button>
@@ -102,6 +140,13 @@ const Header = () => {
           </motion.div>
         )}
       </div>
+
+      {/* Auth Modal */}
+      <AuthModal 
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        initialMode={authMode}
+      />
     </motion.header>
   );
 };

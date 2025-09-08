@@ -1,9 +1,15 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Play, Sparkles, Zap } from "lucide-react";
 import heroBg from "@/assets/hero-bg.jpg";
+import AuthModal from "../auth/AuthModal";
+import DemoModal from "../modals/DemoModal";
 
 const HeroSection = () => {
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showDemoModal, setShowDemoModal] = useState(false);
+
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
       {/* Background */}
@@ -87,12 +93,19 @@ const HeroSection = () => {
             transition={{ duration: 0.8, delay: 1 }}
             className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12"
           >
-            <Button className="btn-cyber text-lg px-8 py-6 h-auto group">
+            <Button 
+              className="btn-cyber text-lg px-8 py-6 h-auto group"
+              onClick={() => setShowAuthModal(true)}
+            >
               <Zap className="w-5 h-5 mr-2 group-hover:animate-pulse" />
               Start Building Free
               <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
             </Button>
-            <Button variant="outline" className="btn-ghost-cyber text-lg px-8 py-6 h-auto group">
+            <Button 
+              variant="outline" 
+              className="btn-ghost-cyber text-lg px-8 py-6 h-auto group"
+              onClick={() => setShowDemoModal(true)}
+            >
               <Play className="w-5 h-5 mr-2" />
               Watch Demo
             </Button>
@@ -120,6 +133,17 @@ const HeroSection = () => {
           </motion.div>
         </motion.div>
       </div>
+
+      {/* Modals */}
+      <AuthModal 
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        initialMode="signup"
+      />
+      <DemoModal 
+        isOpen={showDemoModal}
+        onClose={() => setShowDemoModal(false)}
+      />
 
       {/* Scroll Indicator */}
       <motion.div
