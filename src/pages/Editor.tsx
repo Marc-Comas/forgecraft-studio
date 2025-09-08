@@ -141,39 +141,84 @@ const Editor = () => {
     }
 
     setIsAiProcessing(true);
-    setGenerationPhase('Iniciando generación dual...');
+    const isExistingCode = code.trim().length > 0;
+    
+    if (isExistingCode) {
+      setGenerationPhase('Making targeted changes to existing code...');
+    } else {
+      setGenerationPhase('Iniciando generación dual...');
+    }
     
     try {
-      console.log('🎯 Starting AI enhancement with prompt:', aiPrompt);
+      console.log('🎯 Starting AI with prompt:', aiPrompt);
       
-      toast({
-        title: "Generación Dual Iniciada",
-        description: "Fase 1: Generando estructura HTML + CSS (10K tokens)",
-      });
+      if (!isExistingCode) {
+        toast({
+          title: "Generación Dual Iniciada",
+          description: "Fase 1: Generando estructura HTML + CSS (10K tokens)",
+        });
+      }
 
-      // Simulate phase updates for better UX
-      const phaseUpdateInterval = setInterval(() => {
+      // Build minimal, token-aware prompt
+      let enhancedPrompt;
+      let projectType;
+      let intent;
+      
+      if (isExistingCode) {
+        // For existing code: minimal context + strict output contract
+        enhancedPrompt = `STRICT CONTRACT: Return ONLY valid HTML in html_content field. NO markdown, NO explanations, NO external links.
+
+CHANGE REQUEST: ${aiPrompt}
+
+CURRENT CODE (first 800 chars): ${code.substring(0, 800)}${code.length > 800 ? '...' : ''}
+
+RULES:
+- Keep existing assets/HEAD unchanged unless requested
+- Make MINIMAL changes to fulfill request
+- If partial response, wrap in <!--PARTIAL_HTML_START--> ... <!--PARTIAL_HTML_END-->
+- Return complete valid HTML document`;
+        
+        projectType = 'enhancement';
+        intent = 'enhancement';
+      } else {
+        // For new projects: use dual-phase with clear instructions
+        enhancedPrompt = `STRICT CONTRACT: Generate landing page using dual-phase. Return ONLY html_content field.
+
+PROJECT REQUEST: ${aiPrompt}
+
+PHASE 1: HTML structure + CSS styling (10K tokens max)
+PHASE 2: JavaScript interactivity (5K tokens max)
+
+RULES:
+- NO markdown, NO code fences, NO explanations
+- Return complete valid HTML document
+- Include all CSS in <style> tags, all JS in <script> tags`;
+        
+        projectType = 'landing page';
+        intent = 'code';
+      }
+
+      // Simulate phase updates for UX
+      const phaseUpdateInterval = !isExistingCode ? setInterval(() => {
         setGenerationPhase(prev => {
           if (prev.includes('estructura')) return 'Fase 2: Añadiendo interactividad JavaScript (5K tokens)...';
           if (prev.includes('interactividad')) return 'Finalizando y optimizando código...';
           return 'Generando estructura HTML + CSS...';
         });
-      }, 8000);
+      }, 8000) : null;
 
-      // Call the AI generation function with dual-phase enabled
+      // Call the AI generation function
       const { data: aiResponse, error: aiError } = await supabase.functions.invoke('generate-code', {
         body: {
-          prompt: code.trim() ? 
-            `Based on this existing HTML code, make the following changes: ${aiPrompt}. Here's the current code: ${code.substring(0, 1000)}${code.length > 1000 ? '...' : ''}` : 
-            aiPrompt,
-          projectType: code.trim() ? 'enhancement' : 'landing page',
-          intent: code.trim() ? 'enhancement' : 'code',
-          code: code.trim() || undefined,
-          dualPhase: !code.trim() // Enable dual phase for new projects
+          prompt: enhancedPrompt,
+          projectType,
+          intent,
+          code: isExistingCode ? code.substring(0, 1000) : undefined,
+          dualPhase: !isExistingCode // Only use dual-phase for new projects
         }
       });
 
-      clearInterval(phaseUpdateInterval);
+      if (phaseUpdateInterval) clearInterval(phaseUpdateInterval);
       setGenerationPhase('');
 
       console.log('📥 AI Response received:', { aiResponse, aiError });
@@ -187,21 +232,46 @@ const Editor = () => {
         throw new Error(aiResponse.error);
       }
 
-      // Update the code with AI-generated content
-      const generatedContent = aiResponse.html_content || aiResponse.content;
+      // Handle both html_content and legacy content fields
+      let generatedContent = aiResponse.html_content || aiResponse.content;
+      
+      if (!generatedContent) {
+        throw new Error('No content received from AI');
+      }
+
+      // Handle partial HTML replacement for existing code
+      if (isExistingCode && generatedContent.includes('<!--PARTIAL_HTML_START-->')) {
+        const partialMatch = generatedContent.match(/<!--PARTIAL_HTML_START-->([\s\S]*?)<!--PARTIAL_HTML_END-->/);
+        if (partialMatch) {
+          const partialContent = partialMatch[1].trim();
+          // Simple replacement strategy: replace <main> content or insert before </body>
+          if (code.includes('<main>')) {
+            generatedContent = code.replace(/<main[\s\S]*?<\/main>/i, `<main>${partialContent}</main>`);
+          } else if (code.includes('</body>')) {
+            generatedContent = code.replace('</body>', `${partialContent}\n</body>`);
+          } else {
+            generatedContent = partialContent; // Fallback to partial content
+          }
+        }
+      }
+
       setCode(generatedContent);
       setAiPrompt('');
       
       // Show success message based on generation mode
-      const successTitle = aiResponse.mode === 'dual_phase_complete' ? 
+      const successTitle = isExistingCode ? 
+        'Code Updated' : 
+        aiResponse.mode === 'dual_phase_complete' ? 
         'Generación Dual Completada' : 
         aiResponse.mode === 'dual_phase_fallback' ? 
         'Generación Parcial Completada' :
-        'AI Enhancement Complete';
+        'AI Generation Complete';
       
       const successDescription = aiResponse.messages ? 
         aiResponse.messages.join(' • ') :
-        'Your code has been updated with AI-generated improvements!';
+        isExistingCode ? 
+        'Your code has been updated with the requested changes!' :
+        'Your landing page has been generated successfully!';
       
       toast({
         title: successTitle,
@@ -440,7 +510,7 @@ const Editor = () => {
                     ) : (
                       <>
                         <Sparkles className="w-4 h-4 mr-2" />
-                        {code.trim() ? 'Apply AI Changes' : 'Generate with Dual AI (15K tokens)'}
+                        {code.trim() ? 'Apply Changes (Single-Phase)' : 'Generate New (Dual-Phase AI)'}
                       </>
                     )}
                   </Button>
@@ -448,19 +518,39 @@ const Editor = () => {
                   <div className="border-t border-border pt-6">
                     <h3 className="font-semibold mb-4">Quick Actions</h3>
                     <div className="grid grid-cols-2 gap-3">
-                      <Button variant="outline" size="sm" className="justify-start">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="justify-start"
+                        onClick={() => setAiPrompt('Change the color scheme to use modern gradients')}
+                      >
                         <Palette className="w-4 h-4 mr-2" />
                         Change Colors
                       </Button>
-                      <Button variant="outline" size="sm" className="justify-start">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="justify-start"
+                        onClick={() => setAiPrompt('Add a contact form section with validation')}
+                      >
                         <Settings className="w-4 h-4 mr-2" />
                         Add Components
                       </Button>
-                      <Button variant="outline" size="sm" className="justify-start">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="justify-start"
+                        onClick={() => setAiPrompt('Optimize for mobile devices and improve responsive design')}
+                      >
                         <Monitor className="w-4 h-4 mr-2" />
                         Make Responsive
                       </Button>
-                      <Button variant="outline" size="sm" className="justify-start">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="justify-start"
+                        onClick={() => setAiPrompt('Add smooth scroll animations and hover effects')}
+                      >
                         <Play className="w-4 h-4 mr-2" />
                         Add Animations
                       </Button>

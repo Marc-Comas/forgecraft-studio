@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Play, Sparkles, Zap } from "lucide-react";
 import heroBg from "@/assets/hero-bg.jpg";
@@ -7,8 +8,14 @@ import AuthModal from "../auth/AuthModal";
 import DemoModal from "../modals/DemoModal";
 
 const HeroSection = () => {
+  const navigate = useNavigate();
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showDemoModal, setShowDemoModal] = useState(false);
+
+  const handleAuthSuccess = () => {
+    setShowAuthModal(false);
+    navigate('/dashboard');
+  };
 
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
@@ -138,6 +145,7 @@ const HeroSection = () => {
       <AuthModal 
         isOpen={showAuthModal}
         onClose={() => setShowAuthModal(false)}
+        onSuccess={handleAuthSuccess}
         initialMode="signup"
       />
       <DemoModal 

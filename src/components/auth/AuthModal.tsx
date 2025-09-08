@@ -13,9 +13,10 @@ interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
   initialMode?: 'signin' | 'signup';
+  onSuccess?: () => void;
 }
 
-const AuthModal = ({ isOpen, onClose, initialMode = 'signin' }: AuthModalProps) => {
+const AuthModal = ({ isOpen, onClose, initialMode = 'signin', onSuccess }: AuthModalProps) => {
   const [mode, setMode] = useState<'signin' | 'signup'>(initialMode);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -53,6 +54,8 @@ const AuthModal = ({ isOpen, onClose, initialMode = 'signin' }: AuthModalProps) 
           title: "Welcome back!",
           description: "You've been signed in successfully.",
         });
+        
+        if (onSuccess) onSuccess();
       } else {
         const { error } = await supabase.auth.signUp({
           email: formData.email,
@@ -71,6 +74,8 @@ const AuthModal = ({ isOpen, onClose, initialMode = 'signin' }: AuthModalProps) 
           title: "Account created!",
           description: "Please check your email to verify your account.",
         });
+        
+        if (onSuccess) onSuccess();
       }
 
       onClose();

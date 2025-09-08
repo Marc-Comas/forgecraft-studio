@@ -1,6 +1,9 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Zap, CheckCircle, Sparkles } from "lucide-react";
+import AuthModal from "../auth/AuthModal";
 
 const features = [
   "AI-Powered Generation",
@@ -12,6 +15,13 @@ const features = [
 ];
 
 const CTASection = () => {
+  const navigate = useNavigate();
+  const [showAuthModal, setShowAuthModal] = useState(false);
+
+  const handleAuthSuccess = () => {
+    setShowAuthModal(false);
+    navigate('/dashboard');
+  };
   return (
     <section className="py-24 relative overflow-hidden" id="cta">
       {/* Background Effects */}
@@ -118,7 +128,10 @@ const CTASection = () => {
             className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8"
           >
             <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-              <Button className="btn-cyber text-lg px-10 py-6 h-auto group relative overflow-hidden">
+              <Button 
+                className="btn-cyber text-lg px-10 py-6 h-auto group relative overflow-hidden"
+                onClick={() => setShowAuthModal(true)}
+              >
                 <div className="absolute inset-0 bg-gradient-to-r from-primary/0 via-primary/20 to-primary/0 transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
                 <Zap className="w-5 h-5 mr-2 group-hover:animate-pulse relative z-10" />
                 <span className="relative z-10">Start Building Free</span>
@@ -127,7 +140,11 @@ const CTASection = () => {
             </motion.div>
             
             <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-              <Button variant="outline" className="btn-ghost-cyber text-lg px-10 py-6 h-auto">
+              <Button 
+                variant="outline" 
+                className="btn-ghost-cyber text-lg px-10 py-6 h-auto"
+                onClick={() => setShowAuthModal(true)}
+              >
                 Schedule Demo
               </Button>
             </motion.div>
@@ -162,6 +179,14 @@ const CTASection = () => {
 
       {/* Bottom Wave Effect */}
       <div className="absolute bottom-0 left-0 w-full h-24 bg-gradient-to-t from-background to-transparent" />
+      
+      {/* Auth Modal */}
+      <AuthModal 
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        onSuccess={handleAuthSuccess}
+        initialMode="signup"
+      />
     </section>
   );
 };
