@@ -128,7 +128,7 @@ IMPORTANT: Return ONLY the JSON object, no markdown formatting or additional tex
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt }
       ],
-      max_completion_tokens: 6000,
+      max_completion_tokens: 15000, // Increased significantly for full HTML generation
     };
 
     console.log('📤 Sending request to OpenAI API');
@@ -152,17 +152,42 @@ IMPORTANT: Return ONLY the JSON object, no markdown formatting or additional tex
 
     const data = await response.json();
     console.log('✅ OpenAI response received');
+    console.log('🔍 Response data:', JSON.stringify(data, null, 2));
     
-    // Validate response structure
-    if (!data.choices || !data.choices[0] || !data.choices[0].message || !data.choices[0].message.content) {
-      console.error('❌ Invalid OpenAI response structure:', data);
-      throw new Error('Invalid response structure from OpenAI');
+    // Enhanced validation with better error messages
+    if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+      console.error('❌ Invalid OpenAI response structure - missing choices/message:', JSON.stringify(data, null, 2));
+      throw new Error('Invalid response structure from OpenAI - missing message data');
     }
 
-    const generatedContent = data.choices[0].message.content;
+    const message = data.choices[0].message;
+    const finishReason = data.choices[0].finish_reason;
+    
+    // Check if content is empty due to length limit
+    if (!message.content || message.content.trim() === '') {
+      if (finishReason === 'length') {
+        console.error('❌ OpenAI response truncated due to token limit. Finish reason:', finishReason);
+        console.error('📊 Usage stats:', JSON.stringify(data.usage || {}, null, 2));
+        throw new Error('AI response was truncated due to token limit. Please try a shorter prompt or simplify your request.');
+      } else {
+        console.error('❌ OpenAI returned empty content. Finish reason:', finishReason);
+        throw new Error('AI generated empty content. Please try again with a different prompt.');
+      }
+    }
+
+    console.log('📊 Token usage:', JSON.stringify(data.usage || {}, null, 2));
+    console.log('🏁 Finish reason:', finishReason);
+
+    const generatedContent = data.choices[0].message.content.trim();
     
     console.log('🎉 Successfully generated content (length:', generatedContent.length, 'characters)');
-    console.log('📄 Generated content preview:', generatedContent.substring(0, 200) + '...');
+    console.log('📄 Generated content preview:', generatedContent.substring(0, 300) + '...');
+    
+    // Additional validation for content quality
+    if (generatedContent.length < 100) {
+      console.error('❌ Generated content too short:', generatedContent);
+      throw new Error('Generated content appears incomplete. Please try again.');
+    }
 
     // Try to parse as JSON first (for new format)
     try {

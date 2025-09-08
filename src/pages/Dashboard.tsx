@@ -155,10 +155,27 @@ const Dashboard = () => {
         }
 
         if (response.error) {
-          throw new Error(response.error);
+          console.error('AI response error:', response.error, response.details);
+          throw new Error(response.error + (response.details ? ` - ${response.details}` : ''));
         }
 
-        aiResponse = response;
+        // Handle both new structured format and legacy format
+        if (response.ok && response.content) {
+          // New structured format
+          aiResponse = {
+            html_content: response.content,
+            css_content: '', // CSS is embedded in HTML
+            js_content: ''   // JS is embedded in HTML
+          };
+          console.log('Using new structured AI response format');
+        } else if (response.html_content !== undefined) {
+          // Legacy format
+          aiResponse = response;
+          console.log('Using legacy AI response format');
+        } else {
+          console.error('Invalid AI response format:', response);
+          throw new Error('Invalid response format from AI service');
+        }
       }
 
       // Create the project with AI-generated content
