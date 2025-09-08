@@ -24,6 +24,7 @@ import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import AuthModal from "@/components/auth/AuthModal";
 import type { User, Session } from '@supabase/supabase-js';
+import type { Template } from '@/lib/templates';
 
 interface Project {
   id: string;
@@ -48,7 +49,8 @@ const Dashboard = () => {
   const [newProject, setNewProject] = useState({
     name: '',
     description: '',
-    prompt: ''
+    prompt: '',
+    template: null as Template | null
   });
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
