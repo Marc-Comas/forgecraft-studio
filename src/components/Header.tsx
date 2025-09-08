@@ -12,9 +12,9 @@ const Header = () => {
 
   const navItems = [
     { label: "Dashboard", href: "/dashboard" },
-    { label: "Editor", href: "/editor" },
     { label: "Templates", href: "/templates" },
     { label: "Docs", href: "/docs" },
+    { label: "Settings", href: "/settings" },
   ];
 
   return (

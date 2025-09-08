@@ -6,6 +6,7 @@ const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
 serve(async (req) => {
@@ -28,18 +29,55 @@ serve(async (req) => {
     }
 
     const requestBody = await req.json();
-    const { prompt, projectType = 'landing page' } = requestBody;
+    const { prompt, projectType = 'landing page', projectId, filePath, code, intent = 'code' } = requestBody;
 
     console.log('🚀 Generating code with OpenAI');
     console.log('📝 Prompt length:', prompt?.length || 0);
     console.log('🎯 Project type:', projectType);
     console.log('🔑 API key configured:', !!openAIApiKey);
 
-    const systemPrompt = `You are an expert web developer who creates modern, responsive, and beautiful ${projectType}s using the latest web technologies.
+    let systemPrompt;
+    let userPrompt;
+    
+    // Different prompts based on intent and whether we're editing existing code
+    if (code && intent === 'enhancement') {
+      // AI Assistant mode - enhance existing code
+      systemPrompt = `You are an expert web developer who enhances existing HTML/CSS/JavaScript code based on user instructions.
+
+CRITICAL REQUIREMENTS:
+- Analyze the existing code structure and maintain its overall design and functionality
+- Apply the requested changes while preserving existing working features
+- Ensure the updated code remains responsive and accessible
+- Keep all existing animations and interactions unless specifically asked to change them
+- Maintain the current color scheme and typography unless requested otherwise
+- Generate clean, well-structured code with proper indentation
+
+RESPONSE FORMAT:
+Return a JSON object with the following structure:
+{
+  "ok": true,
+  "mode": "full",
+  "filePath": "index.html",
+  "content": "<!DOCTYPE html>...",
+  "messages": ["Brief description of changes made"],
+  "elapsedMs": 1500
+}
+
+IMPORTANT: Return ONLY the JSON object, no markdown formatting or additional text.`;
+
+      userPrompt = `Current code:
+${code.substring(0, 8000)}${code.length > 8000 ? '\n... [truncated]' : ''}
+
+User request: ${prompt}
+
+Please enhance the code according to the user's request while maintaining existing functionality.`;
+    } else {
+      // Project generation mode - create new templates
+      systemPrompt = `You are an expert web developer who creates modern, responsive, and beautiful ${projectType}s using the latest web technologies.
 
 CRITICAL REQUIREMENTS:
 - Generate a COMPLETE, FUNCTIONAL HTML page with embedded CSS and JavaScript
-- Use modern CSS techniques (flexbox, grid, CSS variables, animations)
+- Use Tailwind CSS via CDN (https://cdn.tailwindcss.com)
 - Implement responsive design that works perfectly on mobile, tablet, and desktop
 - Include interactive JavaScript features where appropriate
 - Use semantic HTML5 elements for accessibility
@@ -49,43 +87,48 @@ CRITICAL REQUIREMENTS:
 - Add smooth transitions and hover effects
 
 TECHNICAL SPECIFICATIONS:
-- Embed ALL CSS in <style> tags within the <head>
+- Use Tailwind CSS classes for styling
+- Embed custom CSS in <style> tags only when absolutely necessary
 - Embed ALL JavaScript in <script> tags before closing </body>
-- Use CSS Grid and Flexbox for layouts
+- Use CSS Grid and Flexbox (via Tailwind) for layouts
 - Implement mobile-first responsive design
 - Add proper viewport meta tag
 - Include favicon and meta descriptions
 - Use modern CSS features (custom properties, clamp(), etc.)
 
-OUTPUT FORMAT:
-Return ONLY the complete HTML code. Do not include markdown formatting, explanations, or any other text. The response must start with <!DOCTYPE html> and be a complete, valid HTML document.
+STRUCTURE REQUIREMENTS:
+- Navigation with logo and menu items
+- Hero section with compelling headline and CTA
+- Features/Services section
+- Gallery/Portfolio/Products section (depending on type)
+- Pricing section (for business/SaaS)
+- FAQ section
+- Contact form with proper validation
+- Footer with links and company info
 
-EXAMPLE STRUCTURE:
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>...</title>
-    <style>
-        /* Modern CSS with animations, responsive design, beautiful styling */
-    </style>
-</head>
-<body>
-    <!-- Semantic HTML with beautiful, functional content -->
-    <script>
-        // Interactive JavaScript functionality
-    </script>
-</body>
-</html>`;
+RESPONSE FORMAT:
+Return a JSON object with the following structure:
+{
+  "ok": true,
+  "mode": "full",
+  "filePath": "index.html",
+  "content": "<!DOCTYPE html>...",
+  "messages": ["Project generated successfully with modern design"],
+  "elapsedMs": 2000
+}
+
+IMPORTANT: Return ONLY the JSON object, no markdown formatting or additional text.`;
+
+      userPrompt = prompt;
+    }
 
     const requestPayload = {
       model: 'gpt-5-2025-08-07',
       messages: [
         { role: 'system', content: systemPrompt },
-        { role: 'user', content: prompt }
+        { role: 'user', content: userPrompt }
       ],
-      max_completion_tokens: 4000,
+      max_completion_tokens: 6000,
     };
 
     console.log('📤 Sending request to OpenAI API');
@@ -116,19 +159,33 @@ EXAMPLE STRUCTURE:
       throw new Error('Invalid response structure from OpenAI');
     }
 
-    const generatedCode = data.choices[0].message.content;
+    const generatedContent = data.choices[0].message.content;
     
-    // Validate that we got HTML content
-    if (!generatedCode.includes('<!DOCTYPE html>') && !generatedCode.includes('<html')) {
-      console.error('❌ Generated content is not valid HTML:', generatedCode.substring(0, 200));
+    console.log('🎉 Successfully generated content (length:', generatedContent.length, 'characters)');
+    console.log('📄 Generated content preview:', generatedContent.substring(0, 200) + '...');
+
+    // Try to parse as JSON first (for new format)
+    try {
+      const jsonResponse = JSON.parse(generatedContent);
+      if (jsonResponse.ok && jsonResponse.content) {
+        console.log('✅ Parsed structured JSON response');
+        return new Response(JSON.stringify(jsonResponse), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    } catch (parseError) {
+      console.log('📝 Not JSON format, treating as raw HTML');
+    }
+
+    // Fallback: treat as raw HTML (legacy mode)
+    if (!generatedContent.includes('<!DOCTYPE html>') && !generatedContent.includes('<html')) {
+      console.error('❌ Generated content is not valid HTML:', generatedContent.substring(0, 200));
       throw new Error('Generated content is not valid HTML');
     }
 
-    console.log('🎉 Successfully generated HTML code (length:', generatedCode.length, 'characters)');
-    console.log('📄 Generated code preview:', generatedCode.substring(0, 200) + '...');
-
+    // Return in legacy format for backward compatibility
     return new Response(JSON.stringify({ 
-      html_content: generatedCode,
+      html_content: generatedContent,
       css_content: '', // CSS is embedded in HTML
       js_content: '' // JS is embedded in HTML
     }), {

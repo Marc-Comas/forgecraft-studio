@@ -128,21 +128,35 @@ const Dashboard = () => {
         description: "AI is creating your project. This may take a moment.",
       });
 
-      // Call the AI generation function
-      const { data: aiResponse, error: aiError } = await supabase.functions.invoke('generate-code', {
-        body: {
-          prompt: `Create a modern, professional ${newProject.name}. ${newProject.description ? `Description: ${newProject.description}. ` : ''}Requirements: ${newProject.prompt}`,
-          projectType: 'landing page'
+      // Use template if selected, otherwise generate from scratch
+      let aiResponse;
+      if (newProject.template) {
+        // Use pre-built template
+        aiResponse = {
+          html_content: newProject.template.html,
+          css_content: '',
+          js_content: ''
+        };
+        console.log('Using template:', newProject.template.name);
+      } else {
+        // Generate with AI
+        const { data: response, error: aiError } = await supabase.functions.invoke('generate-code', {
+          body: {
+            prompt: `Create a modern, professional ${newProject.name}. ${newProject.description ? `Description: ${newProject.description}. ` : ''}Requirements: ${newProject.prompt}`,
+            projectType: 'landing page'
+          }
+        });
+
+        if (aiError) {
+          console.error('AI generation error:', aiError);
+          throw new Error('Failed to generate code with AI');
         }
-      });
 
-      if (aiError) {
-        console.error('AI generation error:', aiError);
-        throw new Error('Failed to generate code with AI');
-      }
+        if (response.error) {
+          throw new Error(response.error);
+        }
 
-      if (aiResponse.error) {
-        throw new Error(aiResponse.error);
+        aiResponse = response;
       }
 
       // Create the project with AI-generated content
@@ -169,7 +183,7 @@ const Dashboard = () => {
       };
 
       setProjects(prev => [createdProject, ...prev]);
-      setNewProject({ name: '', description: '', prompt: '' });
+      setNewProject({ name: '', description: '', prompt: '', template: null });
       setShowNewProject(false);
       
       toast({

@@ -23,6 +23,8 @@ import {
   Utensils
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { templates, getTemplatesByCategory } from "@/lib/templates";
+import { useNavigate } from "react-router-dom";
 
 interface Template {
   id: string;
@@ -38,6 +40,7 @@ interface Template {
 }
 
 const Templates = () => {
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
 
@@ -166,9 +169,12 @@ const Templates = () => {
   };
 
   const handleUseTemplate = (template: Template) => {
+    // Store template in localStorage for Dashboard to use
+    localStorage.setItem('selectedTemplate', JSON.stringify(template));
+    navigate('/dashboard');
     toast({
       title: "Template Selected",
-      description: `Creating new project with ${template.name}`,
+      description: `Go to Dashboard to create project with ${template.name}`,
     });
   };
 

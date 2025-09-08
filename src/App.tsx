@@ -8,6 +8,7 @@ import Dashboard from "./pages/Dashboard";
 import Editor from "./pages/Editor";
 import Templates from "./pages/Templates";
 import Docs from "./pages/Docs";
+import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 import Header from "./components/Header";
 
@@ -28,6 +29,7 @@ const App = () => (
               <Route path="/editor/:projectId" element={<Editor />} />
               <Route path="/templates" element={<Templates />} />
               <Route path="/docs" element={<Docs />} />
+              <Route path="/settings" element={<Settings />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
