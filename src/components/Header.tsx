@@ -2,13 +2,9 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Code, Menu, X, Zap } from "lucide-react";
-import LoginModal from "@/components/auth/LoginModal";
-import { useNavigate } from "react-router-dom";
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [isLoginOpen, setIsLoginOpen] = useState(false);
-  const navigate = useNavigate();
 
   const navItems = [
     { label: "Dashboard", href: "/dashboard" },
@@ -41,24 +37,24 @@ const Header = () => {
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center space-x-8">
             {navItems.map((item, index) => (
-              <motion.button
+              <motion.a
                 key={item.label}
-                onClick={() => navigate(item.href)}
-                className="text-muted-foreground hover:text-foreground transition-colors bg-transparent border-none cursor-pointer"
+                href={item.href}
+                className="text-muted-foreground hover:text-foreground transition-colors"
                 whileHover={{ y: -2 }}
                 transition={{ delay: index * 0.1 }}
               >
                 {item.label}
-              </motion.button>
+              </motion.a>
             ))}
           </nav>
 
           {/* CTA Buttons */}
           <div className="hidden md:flex items-center space-x-4">
-            <Button variant="ghost" size="sm" onClick={() => setIsLoginOpen(true)}>
+            <Button variant="ghost" size="sm">
               Sign In
             </Button>
-            <Button className="btn-cyber" size="sm" onClick={() => navigate('/dashboard')}>
+            <Button className="btn-cyber" size="sm">
               <Zap className="w-4 h-4 mr-2" />
               Start Building
             </Button>
@@ -85,22 +81,19 @@ const Header = () => {
           >
             <nav className="flex flex-col space-y-4 mt-4">
               {navItems.map((item) => (
-                <button
+                <a
                   key={item.label}
-                  onClick={() => {
-                    navigate(item.href);
-                    setIsMenuOpen(false);
-                  }}
-                  className="text-muted-foreground hover:text-foreground transition-colors text-left bg-transparent border-none cursor-pointer"
+                  href={item.href}
+                  className="text-muted-foreground hover:text-foreground transition-colors"
                 >
                   {item.label}
-                </button>
+                </a>
               ))}
               <div className="flex flex-col space-y-2 pt-4 border-t border-border">
-                <Button variant="ghost" size="sm" onClick={() => setIsLoginOpen(true)}>
+                <Button variant="ghost" size="sm">
                   Sign In
                 </Button>
-                <Button className="btn-cyber" size="sm" onClick={() => navigate('/dashboard')}>
+                <Button className="btn-cyber" size="sm">
                   <Zap className="w-4 h-4 mr-2" />
                   Start Building
                 </Button>
@@ -109,8 +102,6 @@ const Header = () => {
           </motion.div>
         )}
       </div>
-      
-      <LoginModal open={isLoginOpen} onOpenChange={setIsLoginOpen} />
     </motion.header>
   );
 };
