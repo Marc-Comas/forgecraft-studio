@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,44 +17,111 @@ import {
   Palette,
   Sparkles,
   FileCode,
-  Monitor
+  Monitor,
+  ArrowLeft
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import type { User } from '@supabase/supabase-js';
+
+interface Project {
+  id: string;
+  name: string;
+  description: string | null;
+  prompt: string | null;
+  html_content: string | null;
+  css_content: string | null;
+  js_content: string | null;
+  status: 'draft' | 'published' | 'archived' | 'generated';
+  user_id: string;
+}
 
 const Editor = () => {
+  const { projectId } = useParams<{ projectId: string }>();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'code' | 'preview' | 'ai'>('code');
-  const [code, setCode] = useState(`<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Your Project</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-gray-900 text-white">
-    <div class="min-h-screen flex items-center justify-center">
-        <div class="text-center">
-            <h1 class="text-6xl font-bold bg-gradient-to-r from-blue-400 to-purple-600 bg-clip-text text-transparent mb-4">
-                Welcome to Editor
-            </h1>
-            <p class="text-xl text-gray-300 mb-8">
-                Start editing your project here
-            </p>
-            <button class="bg-blue-600 hover:bg-blue-700 px-8 py-3 rounded-lg font-semibold transition-colors">
-                Get Started
-            </button>
-        </div>
-    </div>
-</body>
-</html>`);
+  const [project, setProject] = useState<Project | null>(null);
+  const [code, setCode] = useState('');
   const [aiPrompt, setAiPrompt] = useState('');
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+  const [initialLoading, setInitialLoading] = useState(true);
 
-  const handleSave = () => {
-    toast({
-      title: "Saved!",
-      description: "Your changes have been saved successfully.",
-    });
+  useEffect(() => {
+    const checkUserAndLoadProject = async () => {
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+
+      if (!user) {
+        navigate('/dashboard');
+        return;
+      }
+
+      // Load project
+      if (projectId) {
+        await loadProject(projectId, user.id);
+      }
+      
+      setInitialLoading(false);
+    };
+
+    checkUserAndLoadProject();
+  }, [projectId, navigate]);
+
+  const loadProject = async (id: string, userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('projects')
+        .select('*')
+        .eq('id', id)
+        .eq('user_id', userId)
+        .single();
+
+      if (error) throw error;
+
+      setProject({
+        ...data,
+        status: data.status as 'draft' | 'published' | 'archived' | 'generated'
+      });
+      setCode(data.html_content || '');
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Failed to load project",
+        variant: "destructive"
+      });
+      navigate('/dashboard');
+    }
+  };
+
+  const handleSave = async () => {
+    if (!project || !user) return;
+
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from('projects')
+        .update({ html_content: code })
+        .eq('id', project.id)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Saved!",
+        description: "Your changes have been saved successfully.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Failed to save changes",
+        variant: "destructive"
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handlePreview = () => {
@@ -84,11 +152,13 @@ const Editor = () => {
   };
 
   const handleDownload = () => {
+    if (!project) return;
+    
     const blob = new Blob([code], { type: 'text/html' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'project.html';
+    a.download = `${project.name.replace(/\s+/g, '-').toLowerCase()}.html`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -96,9 +166,35 @@ const Editor = () => {
     
     toast({
       title: "Downloaded!",
-      description: "Your project has been downloaded as HTML file.",
+      description: `${project.name} has been downloaded.`,
     });
   };
+
+  if (initialLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading project...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!project) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <h3 className="text-xl font-semibold mb-2">Project not found</h3>
+          <p className="text-muted-foreground mb-6">The project you're looking for doesn't exist</p>
+          <Button onClick={() => navigate('/dashboard')}>
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Dashboard
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -112,9 +208,17 @@ const Editor = () => {
           <div className="container mx-auto px-6 py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-4">
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => navigate('/dashboard')}
+                >
+                  <ArrowLeft className="w-4 h-4 mr-2" />
+                  Back
+                </Button>
                 <div className="flex items-center space-x-2">
                   <Code2 className="w-6 h-6 text-primary" />
-                  <h1 className="text-xl font-heading font-bold">Code Editor</h1>
+                  <h1 className="text-xl font-heading font-bold">{project.name}</h1>
                 </div>
                 <Badge variant="secondary" className="text-xs">
                   <FileCode className="w-3 h-3 mr-1" />
@@ -123,9 +227,14 @@ const Editor = () => {
               </div>
 
               <div className="flex items-center space-x-2">
-                <Button variant="outline" size="sm" onClick={handleSave}>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={handleSave}
+                  disabled={saving}
+                >
                   <Save className="w-4 h-4 mr-2" />
-                  Save
+                  {saving ? 'Saving...' : 'Save'}
                 </Button>
                 <Button variant="outline" size="sm" onClick={handlePreview}>
                   <Eye className="w-4 h-4 mr-2" />

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -12,71 +13,104 @@ import {
   Github, 
   Globe, 
   Settings, 
-  User,
+  User as UserIcon,
   FolderOpen,
   Sparkles,
   Code2,
-  Palette
+  Palette,
+  Edit
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import AuthModal from "@/components/auth/AuthModal";
+import type { User, Session } from '@supabase/supabase-js';
 
 interface Project {
   id: string;
   name: string;
-  description: string;
-  prompt: string;
+  description: string | null;
+  prompt: string | null;
+  html_content: string | null;
+  css_content: string | null;
+  js_content: string | null;
   created_at: string;
-  status: 'draft' | 'generated' | 'published';
-  preview_url?: string;
+  updated_at: string;
+  status: 'draft' | 'published' | 'archived' | 'generated';
+  preview_url?: string | null;
+  user_id: string;
 }
 
 const Dashboard = () => {
+  const navigate = useNavigate();
   const [projects, setProjects] = useState<Project[]>([]);
   const [showNewProject, setShowNewProject] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
   const [newProject, setNewProject] = useState({
     name: '',
     description: '',
     prompt: ''
   });
   const [loading, setLoading] = useState(false);
-  const [user, setUser] = useState<any>(null);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
 
   useEffect(() => {
-    checkUser();
-    loadProjects();
+    // Set up auth state listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        setSession(session);
+        setUser(session?.user ?? null);
+        if (session?.user) {
+          loadProjects(session.user.id);
+        } else {
+          setProjects([]);
+        }
+        setInitialLoading(false);
+      }
+    );
+
+    // Check for existing session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        loadProjects(session.user.id);
+      }
+      setInitialLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  const checkUser = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    setUser(user);
-  };
+  const loadProjects = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('projects')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
 
-  const loadProjects = async () => {
-    // Mock data for now - in real app this would fetch from Supabase
-    const mockProjects: Project[] = [
-      {
-        id: '1',
-        name: 'Tech Startup Landing',
-        description: 'Modern landing page for a SaaS product',
-        prompt: 'Create a modern tech startup landing page with hero section, features, and pricing',
-        created_at: new Date().toISOString(),
-        status: 'published',
-        preview_url: '#'
-      },
-      {
-        id: '2',
-        name: 'E-commerce Store',
-        description: 'Product showcase website',
-        prompt: 'Build an e-commerce landing page with product grid and shopping features',
-        created_at: new Date().toISOString(),
-        status: 'draft'
-      }
-    ];
-    setProjects(mockProjects);
+      if (error) throw error;
+      setProjects((data || []).map(project => ({
+        ...project,
+        status: project.status as 'draft' | 'published' | 'archived' | 'generated'
+      })));
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Failed to load projects",
+        variant: "destructive"
+      });
+    }
   };
 
   const handleCreateProject = async () => {
+    if (!user) {
+      setShowAuthModal(true);
+      return;
+    }
+
     if (!newProject.name || !newProject.prompt) {
       toast({
         title: "Error",
@@ -88,54 +122,191 @@ const Dashboard = () => {
 
     setLoading(true);
     
-    // Simulate AI generation
-    setTimeout(() => {
-      const project: Project = {
-        id: Date.now().toString(),
-        ...newProject,
-        created_at: new Date().toISOString(),
-        status: 'generated'
+    try {
+      // Generate basic HTML based on prompt
+      const generatedHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${newProject.name}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50">
+    <div class="min-h-screen flex items-center justify-center">
+        <div class="text-center">
+            <h1 class="text-4xl font-bold text-gray-900 mb-4">${newProject.name}</h1>
+            <p class="text-xl text-gray-600 mb-8">${newProject.description || 'Generated with AI'}</p>
+            <div class="bg-white p-8 rounded-lg shadow-lg max-w-2xl">
+                <p class="text-gray-700">This project was generated based on: "${newProject.prompt}"</p>
+                <button class="mt-4 bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                    Get Started
+                </button>
+            </div>
+        </div>
+    </div>
+</body>
+</html>`;
+
+      const { data, error } = await supabase
+        .from('projects')
+        .insert({
+          name: newProject.name,
+          description: newProject.description || null,
+          prompt: newProject.prompt,
+          html_content: generatedHtml,
+          css_content: '',
+          js_content: '',
+          status: 'draft',
+          user_id: user.id
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      const createdProject = {
+        ...data,
+        status: data.status as 'draft' | 'published' | 'archived' | 'generated'
       };
-      
-      setProjects(prev => [project, ...prev]);
+
+      setProjects(prev => [createdProject, ...prev]);
       setNewProject({ name: '', description: '', prompt: '' });
       setShowNewProject(false);
-      setLoading(false);
       
       toast({
         title: "Success!",
-        description: "Project generated successfully",
+        description: "Project created successfully",
       });
-    }, 2000);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create project",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEdit = (project: Project) => {
+    navigate(`/editor/${project.id}`);
   };
 
   const handlePreview = (project: Project) => {
-    toast({
-      title: "Preview",
-      description: `Opening preview for ${project.name}`,
-    });
+    if (!project.html_content) {
+      toast({
+        title: "No Content",
+        description: "This project doesn't have any content to preview yet",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Create preview in new window
+    const previewWindow = window.open('', '_blank');
+    if (previewWindow) {
+      previewWindow.document.write(project.html_content);
+      previewWindow.document.close();
+    }
   };
 
   const handleDownload = (project: Project) => {
+    if (!project.html_content) {
+      toast({
+        title: "No Content",
+        description: "This project doesn't have any content to download yet",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const blob = new Blob([project.html_content], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${project.name.replace(/\s+/g, '-').toLowerCase()}.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
     toast({
-      title: "Download",
-      description: `Downloading ${project.name} as ZIP`,
+      title: "Downloaded!",
+      description: `${project.name} has been downloaded`,
     });
   };
 
-  const handleGithubPush = (project: Project) => {
+  const handleDelete = async (project: Project) => {
+    if (!user) return;
+
+    try {
+      const { error } = await supabase
+        .from('projects')
+        .delete()
+        .eq('id', project.id)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      setProjects(prev => prev.filter(p => p.id !== project.id));
+      
+      toast({
+        title: "Deleted",
+        description: `${project.name} has been deleted`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Failed to delete project",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
     toast({
-      title: "GitHub",
-      description: `Pushing ${project.name} to GitHub`,
+      title: "Signed Out",
+      description: "You have been signed out successfully",
     });
   };
 
-  const handleDeploy = (project: Project) => {
-    toast({
-      title: "Deploy",
-      description: `Deploying ${project.name} to Netlify`,
-    });
-  };
+  if (initialLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-background">
+        <div className="container mx-auto px-6 py-8">
+          <div className="text-center py-12">
+            <FolderOpen className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
+            <h3 className="text-xl font-semibold mb-2">Sign in to continue</h3>
+            <p className="text-muted-foreground mb-6">You need to be signed in to view your projects</p>
+            <Button 
+              className="btn-cyber"
+              onClick={() => setShowAuthModal(true)}
+            >
+              <UserIcon className="w-4 h-4 mr-2" />
+              Sign In
+            </Button>
+          </div>
+        </div>
+        <AuthModal 
+          isOpen={showAuthModal} 
+          onClose={() => setShowAuthModal(false)} 
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -152,13 +323,9 @@ const Dashboard = () => {
           </div>
           
           <div className="flex items-center space-x-4 mt-4 md:mt-0">
-            <Button variant="outline" size="sm">
-              <Settings className="w-4 h-4 mr-2" />
-              Settings
-            </Button>
-            <Button variant="outline" size="sm">
-              <User className="w-4 h-4 mr-2" />
-              Profile
+            <Button variant="outline" size="sm" onClick={handleSignOut}>
+              <UserIcon className="w-4 h-4 mr-2" />
+              Sign Out
             </Button>
             <Button 
               className="btn-cyber"
@@ -326,6 +493,14 @@ const Dashboard = () => {
                   <div className="flex flex-wrap gap-2 mb-4">
                     <Button 
                       size="sm" 
+                      className="btn-cyber"
+                      onClick={() => handleEdit(project)}
+                    >
+                      <Edit className="w-4 h-4 mr-1" />
+                      Edit
+                    </Button>
+                    <Button 
+                      size="sm" 
                       variant="outline"
                       onClick={() => handlePreview(project)}
                     >
@@ -338,23 +513,15 @@ const Dashboard = () => {
                       onClick={() => handleDownload(project)}
                     >
                       <Download className="w-4 h-4 mr-1" />
-                      ZIP
+                      Download
                     </Button>
                     <Button 
                       size="sm" 
                       variant="outline"
-                      onClick={() => handleGithubPush(project)}
+                      onClick={() => handleDelete(project)}
+                      className="text-destructive hover:text-destructive"
                     >
-                      <Github className="w-4 h-4 mr-1" />
-                      Push
-                    </Button>
-                    <Button 
-                      size="sm" 
-                      variant="outline"
-                      onClick={() => handleDeploy(project)}
-                    >
-                      <Globe className="w-4 h-4 mr-1" />
-                      Deploy
+                      Delete
                     </Button>
                   </div>
                   
@@ -385,6 +552,11 @@ const Dashboard = () => {
             </Button>
           </motion.div>
         )}
+
+        <AuthModal 
+          isOpen={showAuthModal} 
+          onClose={() => setShowAuthModal(false)} 
+        />
       </div>
     </div>
   );
