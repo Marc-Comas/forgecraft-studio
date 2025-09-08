@@ -57,7 +57,7 @@ const Footer = () => {
                 <Code className="w-5 h-5 text-primary-foreground" />
               </div>
               <span className="text-lg font-heading font-bold text-gradient-primary">
-                SiteForge Studio
+                UX/I Studio
               </span>
             </motion.div>
             
@@ -146,7 +146,7 @@ const Footer = () => {
           <div className="flex flex-col md:flex-row items-center justify-between space-y-4 md:space-y-0">
             {/* Copyright */}
             <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-              <span>© {currentYear} SiteForge Studio. All rights reserved.</span>
+              <span>© {currentYear} UX/I Studio. All rights reserved.</span>
             </div>
 
             {/* Made with Love */}

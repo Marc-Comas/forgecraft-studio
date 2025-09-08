@@ -156,8 +156,8 @@ const AuthModal = ({ isOpen, onClose, initialMode = 'signin' }: AuthModalProps) 
               </CardTitle>
               <p className="text-muted-foreground">
                 {mode === 'signin' 
-                  ? 'Sign in to your SiteForge Studio account' 
-                  : 'Join SiteForge Studio today'
+                  ? 'Sign in to your UX/I Studio account' 
+                  : 'Join UX/I Studio today'
                 }
               </p>
             </CardHeader>

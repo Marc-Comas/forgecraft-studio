@@ -83,7 +83,7 @@ const CTASection = () => {
             transition={{ duration: 0.8, delay: 0.4 }}
             className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto"
           >
-            Join thousands of developers who are already building faster, better websites with SiteForge Studio.
+            Join thousands of developers who are already building faster, better websites with UX/I Studio.
           </motion.p>
 
           {/* Features Grid */}

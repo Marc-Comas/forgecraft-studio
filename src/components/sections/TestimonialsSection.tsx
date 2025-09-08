@@ -13,7 +13,7 @@ const testimonials = [
     company: "TechFlow Inc",
     avatar: "/api/placeholder/64/64",
     rating: 5,
-    quote: "SiteForge Studio transformed our landing page creation process. What used to take weeks now takes hours, and the quality is consistently outstanding.",
+    quote: "UX/I Studio transformed our landing page creation process. What used to take weeks now takes hours, and the quality is consistently outstanding.",
     gradient: "from-primary to-secondary",
   },
   {
@@ -43,7 +43,7 @@ const testimonials = [
     company: "Independent",
     avatar: "/api/placeholder/64/64",
     rating: 5,
-    quote: "As a freelancer, SiteForge Studio has 10x'd my productivity. I can deliver enterprise-quality sites in record time.",
+    quote: "As a freelancer, UX/I Studio has 10x'd my productivity. I can deliver enterprise-quality sites in record time.",
     gradient: "from-primary to-secondary",
   },
   {
@@ -115,7 +115,7 @@ const TestimonialsSection = () => {
           </h2>
           
           <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-            Join thousands of developers and teams who are building faster and better with SiteForge Studio.
+            Join thousands of developers and teams who are building faster and better with UX/I Studio.
           </p>
         </motion.div>
 

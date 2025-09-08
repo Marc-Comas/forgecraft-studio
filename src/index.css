@@ -5,11 +5,11 @@
 /* Import Google Fonts */
 @import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
 
-/* SiteForge Studio Design System - Futuristic Dark Theme */
+/* UX/I Studio Design System - Futuristic Dark Theme */
 
 @layer base {
   :root {
-    /* SiteForge Brand Colors - HSL Format */
+    /* UX/I Studio Brand Colors - HSL Format */
     --background: 226 47% 8%;          /* #0B0F1C - Deep oil blue */
     --foreground: 214 100% 97%;        /* #F3F6FF - Bluish white */
 

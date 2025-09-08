@@ -158,7 +158,7 @@ const FeaturesSection = () => {
             className="btn-cyber px-8 py-4 text-lg group"
           >
             <Zap className="w-5 h-5 mr-2 group-hover:animate-pulse" />
-            Try SiteForge Studio
+            Try UX/I Studio
           </motion.button>
         </motion.div>
       </div>

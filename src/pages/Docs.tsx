@@ -59,7 +59,7 @@ const Docs = () => {
     {
       category: "Basics",
       articles: [
-        { title: "Introduction to SiteForge Studio", description: "Overview of features and capabilities" },
+        { title: "Introduction to UX/I Studio", description: "Overview of features and capabilities" },
         { title: "Creating Your First Project", description: "Step-by-step tutorial" },
         { title: "Understanding AI Generation", description: "How our AI works" },
         { title: "Project Management", description: "Organizing and managing projects" }
@@ -129,7 +129,7 @@ const Docs = () => {
             <span className="text-gradient-primary">Documentation</span> & Help
           </h1>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto mb-8">
-            Everything you need to know about using SiteForge Studio effectively
+            Everything you need to know about using UX/I Studio effectively
           </p>
           
           {/* Search */}
@@ -333,7 +333,7 @@ const Docs = () => {
             Need more help?
           </h2>
           <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-            Our support team is here to help you succeed with SiteForge Studio
+            Our support team is here to help you succeed with UX/I Studio
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <Button variant="outline">

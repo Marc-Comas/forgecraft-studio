@@ -35,7 +35,7 @@ const Header = () => {
                 <Code className="w-6 h-6 text-primary-foreground" />
               </div>
               <span className="text-xl font-heading font-bold text-gradient-primary">
-                SiteForge Studio
+                UX/I Studio
               </span>
             </motion.div>
           </Link>

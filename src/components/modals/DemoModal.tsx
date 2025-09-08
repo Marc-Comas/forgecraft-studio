@@ -40,7 +40,7 @@ const DemoModal = ({ isOpen, onClose }: DemoModalProps) => {
               </Button>
               
               <CardTitle className="text-2xl font-heading">
-                SiteForge Studio Demo
+                UX/I Studio Demo
               </CardTitle>
               <p className="text-muted-foreground">
                 See how easy it is to create stunning websites with AI
@@ -57,7 +57,7 @@ const DemoModal = ({ isOpen, onClose }: DemoModalProps) => {
                     </div>
                     <h3 className="text-xl font-semibold mb-2">Interactive Demo</h3>
                     <p className="text-muted-foreground mb-6 max-w-md">
-                      Watch how SiteForge Studio generates professional websites in seconds
+                      Watch how UX/I Studio generates professional websites in seconds
                     </p>
                     <div className="flex flex-col sm:flex-row gap-3 justify-center">
                       <Button className="btn-cyber">
