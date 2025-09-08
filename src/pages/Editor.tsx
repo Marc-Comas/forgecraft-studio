@@ -48,6 +48,7 @@ const Editor = () => {
   const [saving, setSaving] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [initialLoading, setInitialLoading] = useState(true);
+  const [generationPhase, setGenerationPhase] = useState<string>('');
 
   useEffect(() => {
     const checkUserAndLoadProject = async () => {
@@ -140,28 +141,46 @@ const Editor = () => {
     }
 
     setIsAiProcessing(true);
+    setGenerationPhase('Iniciando generación dual...');
     
     try {
       console.log('🎯 Starting AI enhancement with prompt:', aiPrompt);
       
       toast({
-        title: "AI Processing...",
-        description: "Enhancing your code with AI. This may take a moment.",
+        title: "Generación Dual Iniciada",
+        description: "Fase 1: Generando estructura HTML + CSS (10K tokens)",
       });
 
-      // Call the AI generation function with current code context
+      // Simulate phase updates for better UX
+      const phaseUpdateInterval = setInterval(() => {
+        setGenerationPhase(prev => {
+          if (prev.includes('estructura')) return 'Fase 2: Añadiendo interactividad JavaScript (5K tokens)...';
+          if (prev.includes('interactividad')) return 'Finalizando y optimizando código...';
+          return 'Generando estructura HTML + CSS...';
+        });
+      }, 8000);
+
+      // Call the AI generation function with dual-phase enabled
       const { data: aiResponse, error: aiError } = await supabase.functions.invoke('generate-code', {
         body: {
-          prompt: `Based on this existing HTML code, make the following changes: ${aiPrompt}. Here's the current code: ${code.substring(0, 1000)}${code.length > 1000 ? '...' : ''}`,
-          projectType: 'enhancement'
+          prompt: code.trim() ? 
+            `Based on this existing HTML code, make the following changes: ${aiPrompt}. Here's the current code: ${code.substring(0, 1000)}${code.length > 1000 ? '...' : ''}` : 
+            aiPrompt,
+          projectType: code.trim() ? 'enhancement' : 'landing page',
+          intent: code.trim() ? 'enhancement' : 'code',
+          code: code.trim() || undefined,
+          dualPhase: !code.trim() // Enable dual phase for new projects
         }
       });
+
+      clearInterval(phaseUpdateInterval);
+      setGenerationPhase('');
 
       console.log('📥 AI Response received:', { aiResponse, aiError });
 
       if (aiError) {
         console.error('AI enhancement error:', aiError);
-        throw new Error('Failed to enhance code with AI');
+        throw new Error('Failed to generate code with AI');
       }
 
       if (aiResponse.error) {
@@ -169,18 +188,31 @@ const Editor = () => {
       }
 
       // Update the code with AI-generated content
-      setCode(aiResponse.html_content);
+      const generatedContent = aiResponse.html_content || aiResponse.content;
+      setCode(generatedContent);
       setAiPrompt('');
       
+      // Show success message based on generation mode
+      const successTitle = aiResponse.mode === 'dual_phase_complete' ? 
+        'Generación Dual Completada' : 
+        aiResponse.mode === 'dual_phase_fallback' ? 
+        'Generación Parcial Completada' :
+        'AI Enhancement Complete';
+      
+      const successDescription = aiResponse.messages ? 
+        aiResponse.messages.join(' • ') :
+        'Your code has been updated with AI-generated improvements!';
+      
       toast({
-        title: "AI Enhancement Complete",
-        description: "Your code has been updated with AI-generated improvements!",
+        title: successTitle,
+        description: successDescription,
       });
     } catch (error: any) {
-      console.error('Error enhancing with AI:', error);
+      setGenerationPhase('');
+      console.error('Error with AI generation:', error);
       toast({
         title: "Error",
-        description: error.message || "Failed to enhance code with AI. Please try again.",
+        description: error.message || "Failed to generate code with AI. Please try again.",
         variant: "destructive"
       });
     } finally {
@@ -386,6 +418,15 @@ const Editor = () => {
                     />
                   </div>
                   
+                  {generationPhase && (
+                    <div className="mb-4 p-3 bg-primary/10 border border-primary/20 rounded-lg">
+                      <div className="flex items-center space-x-2 text-sm">
+                        <div className="animate-spin w-3 h-3 border-2 border-primary border-t-transparent rounded-full" />
+                        <span className="text-primary font-medium">{generationPhase}</span>
+                      </div>
+                    </div>
+                  )}
+                  
                   <Button 
                     className="btn-cyber w-full"
                     onClick={handleAiEdit}
@@ -394,12 +435,12 @@ const Editor = () => {
                     {isAiProcessing ? (
                       <>
                         <div className="animate-spin w-4 h-4 mr-2 border-2 border-primary border-t-transparent rounded-full" />
-                        Processing...
+                        {generationPhase || 'Processing...'}
                       </>
                     ) : (
                       <>
                         <Sparkles className="w-4 h-4 mr-2" />
-                        Apply AI Changes
+                        {code.trim() ? 'Apply AI Changes' : 'Generate with Dual AI (15K tokens)'}
                       </>
                     )}
                   </Button>

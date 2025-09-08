@@ -57,6 +57,14 @@ serve(async (req) => {
     console.log('📝 Prompt length:', prompt?.length || 0);
     console.log('🎯 Project type:', projectType);
 
+    // Implement dual-phase generation system
+    const isDualPhase = requestBody.dualPhase !== false; // Default to true
+    
+    if (isDualPhase && (!code || intent !== 'enhancement')) {
+      console.log('🎯 Starting dual-phase generation (Phase 1: Structure)');
+      return await handleDualPhaseGeneration(prompt, projectType, openAIApiKey);
+    }
+
     let systemPrompt;
     let userPrompt;
     
@@ -93,7 +101,7 @@ User request: ${prompt}
 
 Please enhance the code according to the user's request while maintaining existing functionality.`;
     } else {
-      // Project generation mode - create new templates
+      // Project generation mode - create new templates (single phase fallback)
       systemPrompt = `You are an expert web developer who creates modern, responsive, and beautiful ${projectType}s using the latest web technologies.
 
 CRITICAL REQUIREMENTS:
@@ -263,3 +271,167 @@ IMPORTANT: Return ONLY the JSON object, no markdown formatting or additional tex
     });
   }
 });
+
+// Dual-phase generation function
+async function handleDualPhaseGeneration(prompt: string, projectType: string, apiKey: string) {
+  const startTime = Date.now();
+  
+  try {
+    console.log('🚀 Phase 1: Generating HTML structure and CSS (10,000 tokens)');
+    
+    // Phase 1: HTML Structure + CSS (10,000 tokens)
+    const phase1SystemPrompt = `You are an expert web developer creating the HTML structure and CSS styling for a ${projectType}.
+
+PHASE 1 FOCUS: HTML Structure + CSS Styling
+- Generate complete HTML structure with embedded CSS
+- Use Tailwind CSS via CDN (https://cdn.tailwindcss.com)
+- Create responsive design and beautiful styling
+- Include meta tags, viewport, and SEO elements
+- NO JavaScript functionality yet - focus on structure and appearance
+- Add placeholder content and forms (no JavaScript validation yet)
+
+CRITICAL REQUIREMENTS:
+- Generate a COMPLETE HTML structure with embedded CSS
+- Use semantic HTML5 elements for accessibility
+- Implement mobile-first responsive design
+- Create professional, modern styling
+- Add smooth transitions and hover effects via CSS only
+
+RESPONSE FORMAT:
+Return a JSON object:
+{
+  "ok": true,
+  "phase": 1,
+  "content": "<!DOCTYPE html>...",
+  "messages": ["Phase 1: Structure and styling completed"],
+  "ready_for_phase2": true
+}
+
+IMPORTANT: Return ONLY the JSON object, no markdown formatting.`;
+
+    const phase1Response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-5-2025-08-07',
+        messages: [
+          { role: 'system', content: phase1SystemPrompt },
+          { role: 'user', content: prompt }
+        ],
+        max_completion_tokens: 10000,
+      }),
+    });
+
+    if (!phase1Response.ok) {
+      throw new Error(`Phase 1 failed: ${phase1Response.statusText}`);
+    }
+
+    const phase1Data = await phase1Response.json();
+    console.log('✅ Phase 1 completed, token usage:', JSON.stringify(phase1Data.usage || {}));
+
+    let phase1Content;
+    try {
+      const phase1Json = JSON.parse(phase1Data.choices[0].message.content);
+      phase1Content = phase1Json.content;
+    } catch {
+      phase1Content = phase1Data.choices[0].message.content;
+    }
+
+    console.log('🚀 Phase 2: Adding JavaScript interactivity (5,000 tokens)');
+    
+    // Phase 2: JavaScript Enhancement (5,000 tokens)
+    const phase2SystemPrompt = `You are an expert web developer adding JavaScript interactivity to an existing HTML/CSS structure.
+
+PHASE 2 FOCUS: JavaScript Enhancement
+- Add interactive JavaScript functionality to the existing HTML structure
+- Implement form validation, animations, and user interactions  
+- Add event listeners, dynamic content, and smooth scrolling
+- Enhance the user experience with modern JavaScript features
+- Keep the existing HTML structure and CSS styling intact
+
+CRITICAL REQUIREMENTS:
+- Analyze the provided HTML structure
+- Add JavaScript in <script> tags before closing </body>
+- Implement proper form validation and error handling
+- Add smooth scrolling, modals, and interactive elements
+- Maintain the existing design and layout
+
+RESPONSE FORMAT:
+Return ONLY the complete, enhanced HTML with JavaScript added:
+<!DOCTYPE html>
+<html>...
+</html>
+
+IMPORTANT: Return the complete HTML including the JavaScript enhancements.`;
+
+    const phase2Response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-5-2025-08-07',
+        messages: [
+          { role: 'system', content: phase2SystemPrompt },
+          { role: 'user', content: `Here's the HTML structure from Phase 1. Please add JavaScript interactivity:\n\n${phase1Content.substring(0, 6000)}${phase1Content.length > 6000 ? '...[truncated]' : ''}` }
+        ],
+        max_completion_tokens: 5000,
+      }),
+    });
+
+    const elapsedMs = Date.now() - startTime;
+
+    if (!phase2Response.ok) {
+      console.log('⚠️ Phase 2 failed, returning Phase 1 result as fallback');
+      return new Response(JSON.stringify({
+        ok: true,
+        mode: "dual_phase_fallback",
+        phase: 1,
+        content: phase1Content,
+        messages: ["Phase 1 completed successfully. Phase 2 failed - using structure-only version."],
+        elapsedMs
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const phase2Data = await phase2Response.json();
+    console.log('✅ Phase 2 completed, token usage:', JSON.stringify(phase2Data.usage || {}));
+
+    const finalContent = phase2Data.choices[0].message.content.trim();
+    
+    console.log('🎉 Dual-phase generation completed successfully');
+    console.log('📊 Total time:', elapsedMs, 'ms');
+
+    return new Response(JSON.stringify({
+      ok: true,
+      mode: "dual_phase_complete",
+      phase: 2,
+      content: finalContent,
+      messages: [
+        "Phase 1: HTML structure and CSS completed (10K tokens)",
+        "Phase 2: JavaScript interactivity added (5K tokens)",
+        `Total generation time: ${Math.round(elapsedMs/1000)}s`
+      ],
+      elapsedMs,
+      html_content: finalContent, // For backward compatibility
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+
+  } catch (error) {
+    console.error('💥 Error in dual-phase generation:', error.message);
+    
+    return new Response(JSON.stringify({ 
+      error: `Dual-phase generation failed: ${error.message}`,
+      details: 'Check the function logs for more information'
+    }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+}
