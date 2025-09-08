@@ -44,6 +44,7 @@ const Editor = () => {
   const [code, setCode] = useState('');
   const [aiPrompt, setAiPrompt] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isAiProcessing, setIsAiProcessing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [initialLoading, setInitialLoading] = useState(true);
@@ -138,17 +139,49 @@ const Editor = () => {
       return;
     }
 
-    setLoading(true);
+    setIsAiProcessing(true);
     
-    // Simulate AI processing
-    setTimeout(() => {
-      setLoading(false);
+    try {
       toast({
-        title: "AI Edit Applied",
-        description: "Your code has been updated based on the AI prompt",
+        title: "AI Processing...",
+        description: "Enhancing your code with AI. This may take a moment.",
       });
+
+      // Call the AI generation function with current code context
+      const { data: aiResponse, error: aiError } = await supabase.functions.invoke('generate-code', {
+        body: {
+          prompt: `Based on this existing HTML code, make the following changes: ${aiPrompt}. Here's the current code: ${code.substring(0, 1000)}${code.length > 1000 ? '...' : ''}`,
+          projectType: 'enhancement'
+        }
+      });
+
+      if (aiError) {
+        console.error('AI enhancement error:', aiError);
+        throw new Error('Failed to enhance code with AI');
+      }
+
+      if (aiResponse.error) {
+        throw new Error(aiResponse.error);
+      }
+
+      // Update the code with AI-generated content
+      setCode(aiResponse.html_content);
       setAiPrompt('');
-    }, 2000);
+      
+      toast({
+        title: "AI Enhancement Complete",
+        description: "Your code has been updated with AI-generated improvements!",
+      });
+    } catch (error: any) {
+      console.error('Error enhancing with AI:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to enhance code with AI. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsAiProcessing(false);
+    }
   };
 
   const handleDownload = () => {
@@ -352,9 +385,9 @@ const Editor = () => {
                   <Button 
                     className="btn-cyber w-full"
                     onClick={handleAiEdit}
-                    disabled={loading}
+                    disabled={isAiProcessing}
                   >
-                    {loading ? (
+                    {isAiProcessing ? (
                       <>
                         <div className="animate-spin w-4 h-4 mr-2 border-2 border-primary border-t-transparent rounded-full" />
                         Processing...

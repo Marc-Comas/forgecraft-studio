@@ -123,41 +123,39 @@ const Dashboard = () => {
     setLoading(true);
     
     try {
-      // Generate basic HTML based on prompt
-      const generatedHtml = `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>${newProject.name}</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-gray-50">
-    <div class="min-h-screen flex items-center justify-center">
-        <div class="text-center">
-            <h1 class="text-4xl font-bold text-gray-900 mb-4">${newProject.name}</h1>
-            <p class="text-xl text-gray-600 mb-8">${newProject.description || 'Generated with AI'}</p>
-            <div class="bg-white p-8 rounded-lg shadow-lg max-w-2xl">
-                <p class="text-gray-700">This project was generated based on: "${newProject.prompt}"</p>
-                <button class="mt-4 bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors">
-                    Get Started
-                </button>
-            </div>
-        </div>
-    </div>
-</body>
-</html>`;
+      toast({
+        title: "Generating...",
+        description: "AI is creating your project. This may take a moment.",
+      });
 
+      // Call the AI generation function
+      const { data: aiResponse, error: aiError } = await supabase.functions.invoke('generate-code', {
+        body: {
+          prompt: `Create a modern, professional ${newProject.name}. ${newProject.description ? `Description: ${newProject.description}. ` : ''}Requirements: ${newProject.prompt}`,
+          projectType: 'landing page'
+        }
+      });
+
+      if (aiError) {
+        console.error('AI generation error:', aiError);
+        throw new Error('Failed to generate code with AI');
+      }
+
+      if (aiResponse.error) {
+        throw new Error(aiResponse.error);
+      }
+
+      // Create the project with AI-generated content
       const { data, error } = await supabase
         .from('projects')
         .insert({
           name: newProject.name,
           description: newProject.description || null,
           prompt: newProject.prompt,
-          html_content: generatedHtml,
-          css_content: '',
-          js_content: '',
-          status: 'draft',
+          html_content: aiResponse.html_content,
+          css_content: aiResponse.css_content || '',
+          js_content: aiResponse.js_content || '',
+          status: 'generated',
           user_id: user.id
         })
         .select()
@@ -176,7 +174,7 @@ const Dashboard = () => {
       
       toast({
         title: "Success!",
-        description: "Project created successfully",
+        description: "Project generated successfully with AI!",
       });
     } catch (error: any) {
       toast({
