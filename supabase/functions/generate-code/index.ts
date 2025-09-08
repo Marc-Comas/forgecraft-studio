@@ -17,16 +17,23 @@ serve(async (req) => {
   try {
     // Validate API key exists
     if (!openAIApiKey) {
-      console.error('OpenAI API key is not configured');
-      throw new Error('OpenAI API key is not configured in secrets');
+      console.error('❌ OpenAI API key is not configured');
+      return new Response(JSON.stringify({ 
+        error: 'OpenAI API key is not configured in secrets',
+        details: 'Please check your secrets configuration'
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     const requestBody = await req.json();
     const { prompt, projectType = 'landing page' } = requestBody;
 
     console.log('🚀 Generating code with OpenAI');
-    console.log('📝 Prompt:', prompt);
+    console.log('📝 Prompt length:', prompt?.length || 0);
     console.log('🎯 Project type:', projectType);
+    console.log('🔑 API key configured:', !!openAIApiKey);
 
     const systemPrompt = `You are an expert web developer who creates modern, responsive, and beautiful ${projectType}s using the latest web technologies.
 

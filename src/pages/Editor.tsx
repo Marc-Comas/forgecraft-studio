@@ -142,6 +142,8 @@ const Editor = () => {
     setIsAiProcessing(true);
     
     try {
+      console.log('🎯 Starting AI enhancement with prompt:', aiPrompt);
+      
       toast({
         title: "AI Processing...",
         description: "Enhancing your code with AI. This may take a moment.",
@@ -154,6 +156,8 @@ const Editor = () => {
           projectType: 'enhancement'
         }
       });
+
+      console.log('📥 AI Response received:', { aiResponse, aiError });
 
       if (aiError) {
         console.error('AI enhancement error:', aiError);
