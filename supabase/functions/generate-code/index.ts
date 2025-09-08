@@ -1,8 +1,6 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
-const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
-
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -10,12 +8,23 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
+  console.log('🚀 Function called with method:', req.method);
+  
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
+    console.log('✅ Handling CORS preflight');
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
+    console.log('📝 Processing request...');
+    
+    // Test if we can read the secret
+    const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
+    console.log('🔑 API key configured:', !!openAIApiKey);
+    console.log('🔑 API key length:', openAIApiKey ? openAIApiKey.length : 0);
+    console.log('🔑 API key prefix:', openAIApiKey ? openAIApiKey.substring(0, 7) + '***' : 'NOT_FOUND');
+
     // Validate API key exists
     if (!openAIApiKey) {
       console.error('❌ OpenAI API key is not configured');
@@ -28,13 +37,25 @@ serve(async (req) => {
       });
     }
 
+    if (openAIApiKey.length < 10) {
+      console.error('❌ OpenAI API key appears invalid (too short)');
+      return new Response(JSON.stringify({ 
+        error: 'OpenAI API key appears invalid',
+        details: 'API key is too short'
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const requestBody = await req.json();
+    console.log('📋 Request body received:', JSON.stringify(requestBody, null, 2));
+    
     const { prompt, projectType = 'landing page', projectId, filePath, code, intent = 'code' } = requestBody;
 
     console.log('🚀 Generating code with OpenAI');
     console.log('📝 Prompt length:', prompt?.length || 0);
     console.log('🎯 Project type:', projectType);
-    console.log('🔑 API key configured:', !!openAIApiKey);
 
     let systemPrompt;
     let userPrompt;
@@ -128,10 +149,11 @@ IMPORTANT: Return ONLY the JSON object, no markdown formatting or additional tex
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt }
       ],
-      max_completion_tokens: 15000, // Increased significantly for full HTML generation
+      max_completion_tokens: 15000,
     };
 
-    console.log('📤 Sending request to OpenAI API');
+    console.log('📤 Sending request to OpenAI API...');
+    console.log('🔗 Making fetch to:', 'https://api.openai.com/v1/chat/completions');
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -143,16 +165,30 @@ IMPORTANT: Return ONLY the JSON object, no markdown formatting or additional tex
     });
 
     console.log('📥 OpenAI response status:', response.status);
+    console.log('📥 OpenAI response headers:', JSON.stringify([...response.headers.entries()]));
 
     if (!response.ok) {
-      const errorData = await response.json();
-      console.error('❌ OpenAI API error:', errorData);
-      throw new Error(`OpenAI API error: ${errorData.error?.message || 'Unknown error'}`);
+      const errorText = await response.text();
+      console.error('❌ OpenAI API error response:', errorText);
+      console.error('❌ OpenAI API status:', response.status);
+      console.error('❌ OpenAI API status text:', response.statusText);
+      
+      let errorMessage = `OpenAI API error (${response.status}): ${response.statusText}`;
+      
+      try {
+        const errorData = JSON.parse(errorText);
+        errorMessage = `OpenAI API error: ${errorData.error?.message || errorText}`;
+      } catch (e) {
+        errorMessage = `OpenAI API error: ${errorText}`;
+      }
+      
+      throw new Error(errorMessage);
     }
 
     const data = await response.json();
-    console.log('✅ OpenAI response received');
-    console.log('🔍 Response data:', JSON.stringify(data, null, 2));
+    console.log('✅ OpenAI response received successfully');
+    console.log('📊 Response data keys:', Object.keys(data));
+    console.log('📊 Token usage:', JSON.stringify(data.usage || {}, null, 2));
     
     // Enhanced validation with better error messages
     if (!data.choices || !data.choices[0] || !data.choices[0].message) {
@@ -163,11 +199,12 @@ IMPORTANT: Return ONLY the JSON object, no markdown formatting or additional tex
     const message = data.choices[0].message;
     const finishReason = data.choices[0].finish_reason;
     
+    console.log('🏁 Finish reason:', finishReason);
+    
     // Check if content is empty due to length limit
     if (!message.content || message.content.trim() === '') {
       if (finishReason === 'length') {
         console.error('❌ OpenAI response truncated due to token limit. Finish reason:', finishReason);
-        console.error('📊 Usage stats:', JSON.stringify(data.usage || {}, null, 2));
         throw new Error('AI response was truncated due to token limit. Please try a shorter prompt or simplify your request.');
       } else {
         console.error('❌ OpenAI returned empty content. Finish reason:', finishReason);
@@ -175,10 +212,7 @@ IMPORTANT: Return ONLY the JSON object, no markdown formatting or additional tex
       }
     }
 
-    console.log('📊 Token usage:', JSON.stringify(data.usage || {}, null, 2));
-    console.log('🏁 Finish reason:', finishReason);
-
-    const generatedContent = data.choices[0].message.content.trim();
+    const generatedContent = message.content.trim();
     
     console.log('🎉 Successfully generated content (length:', generatedContent.length, 'characters)');
     console.log('📄 Generated content preview:', generatedContent.substring(0, 300) + '...');
@@ -193,13 +227,14 @@ IMPORTANT: Return ONLY the JSON object, no markdown formatting or additional tex
     try {
       const jsonResponse = JSON.parse(generatedContent);
       if (jsonResponse.ok && jsonResponse.content) {
-        console.log('✅ Parsed structured JSON response');
+        console.log('✅ Parsed structured JSON response successfully');
         return new Response(JSON.stringify(jsonResponse), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
     } catch (parseError) {
       console.log('📝 Not JSON format, treating as raw HTML');
+      console.log('🔍 Parse error:', parseError.message);
     }
 
     // Fallback: treat as raw HTML (legacy mode)
@@ -209,20 +244,26 @@ IMPORTANT: Return ONLY the JSON object, no markdown formatting or additional tex
     }
 
     // Return in legacy format for backward compatibility
-    return new Response(JSON.stringify({ 
+    const legacyResponse = { 
       html_content: generatedContent,
       css_content: '', // CSS is embedded in HTML
       js_content: '' // JS is embedded in HTML
-    }), {
+    };
+    
+    console.log('✅ Returning legacy format response');
+    return new Response(JSON.stringify(legacyResponse), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
+    
   } catch (error) {
-    console.error('💥 Error in generate-code function:', error);
+    console.error('💥 Error in generate-code function:', error.message);
+    console.error('📍 Error name:', error.name);
     console.error('📍 Error stack:', error.stack);
     
     return new Response(JSON.stringify({ 
       error: error.message || 'Failed to generate code',
-      details: 'Check the function logs for more information'
+      details: 'Check the function logs for more information',
+      errorName: error.name
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
