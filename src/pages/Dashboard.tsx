@@ -6,13 +6,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Plus, 
-  Eye, 
-  Download, 
-  Github, 
-  Globe, 
-  Settings, 
+import {
+  Plus,
+  Eye,
+  Download,
+  Github,
+  Globe,
+  Settings,
   User as UserIcon,
   FolderOpen,
   Sparkles,
@@ -123,7 +123,7 @@ const Dashboard = () => {
     }
 
     setLoading(true);
-    
+
     try {
       toast({
         title: "Generating...",
@@ -145,7 +145,8 @@ const Dashboard = () => {
         const { data: response, error: aiError } = await supabase.functions.invoke('generate-code', {
           body: {
             prompt: `Create a modern, professional ${newProject.name}. ${newProject.description ? `Description: ${newProject.description}. ` : ''}Requirements: ${newProject.prompt}`,
-            projectType: 'landing page'
+            projectType: 'landing page',
+            dualPhase: false
           }
         });
 
@@ -204,7 +205,7 @@ const Dashboard = () => {
       setProjects(prev => [createdProject, ...prev]);
       setNewProject({ name: '', description: '', prompt: '', template: null });
       setShowNewProject(false);
-      
+
       toast({
         title: "Success!",
         description: "Project generated successfully with AI!",
@@ -261,7 +262,7 @@ const Dashboard = () => {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    
+
     toast({
       title: "Downloaded!",
       description: `${project.name} has been downloaded`,
@@ -281,7 +282,7 @@ const Dashboard = () => {
       if (error) throw error;
 
       setProjects(prev => prev.filter(p => p.id !== project.id));
-      
+
       toast({
         title: "Deleted",
         description: `${project.name} has been deleted`,
@@ -322,7 +323,7 @@ const Dashboard = () => {
             <FolderOpen className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
             <h3 className="text-xl font-semibold mb-2">Sign in to continue</h3>
             <p className="text-muted-foreground mb-6">You need to be signed in to view your projects</p>
-            <Button 
+            <Button
               className="btn-cyber"
               onClick={() => setShowAuthModal(true)}
             >
@@ -331,9 +332,9 @@ const Dashboard = () => {
             </Button>
           </div>
         </div>
-        <AuthModal 
-          isOpen={showAuthModal} 
-          onClose={() => setShowAuthModal(false)} 
+        <AuthModal
+          isOpen={showAuthModal}
+          onClose={() => setShowAuthModal(false)}
         />
       </div>
     );
@@ -343,7 +344,7 @@ const Dashboard = () => {
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-6 py-8">
         {/* Header */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="flex flex-col md:flex-row md:items-center justify-between mb-8"
@@ -352,13 +353,13 @@ const Dashboard = () => {
             <h1 className="text-3xl font-heading font-bold mb-2">Dashboard</h1>
             <p className="text-muted-foreground">Manage your AI-generated projects</p>
           </div>
-          
+
           <div className="flex items-center space-x-4 mt-4 md:mt-0">
             <Button variant="outline" size="sm" onClick={handleSignOut}>
               <UserIcon className="w-4 h-4 mr-2" />
               Sign Out
             </Button>
-            <Button 
+            <Button
               className="btn-cyber"
               onClick={() => setShowNewProject(true)}
             >
@@ -369,7 +370,7 @@ const Dashboard = () => {
         </motion.div>
 
         {/* Stats Cards */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
@@ -386,7 +387,7 @@ const Dashboard = () => {
               </div>
             </CardContent>
           </Card>
-          
+
           <Card className="bg-card/50 backdrop-blur-sm border-secondary/10">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
@@ -398,7 +399,7 @@ const Dashboard = () => {
               </div>
             </CardContent>
           </Card>
-          
+
           <Card className="bg-card/50 backdrop-blur-sm border-accent/10">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
@@ -410,7 +411,7 @@ const Dashboard = () => {
               </div>
             </CardContent>
           </Card>
-          
+
           <Card className="bg-card/50 backdrop-blur-sm border-muted/20">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
@@ -447,7 +448,7 @@ const Dashboard = () => {
                     onChange={(e) => setNewProject(prev => ({ ...prev, name: e.target.value }))}
                   />
                 </div>
-                
+
                 <div>
                   <label className="text-sm font-medium mb-2 block">Description (Optional)</label>
                   <Input
@@ -456,7 +457,7 @@ const Dashboard = () => {
                     onChange={(e) => setNewProject(prev => ({ ...prev, description: e.target.value }))}
                   />
                 </div>
-                
+
                 <div>
                   <label className="text-sm font-medium mb-2 block">AI Prompt</label>
                   <Textarea
@@ -466,17 +467,17 @@ const Dashboard = () => {
                     onChange={(e) => setNewProject(prev => ({ ...prev, prompt: e.target.value }))}
                   />
                 </div>
-                
+
                 <div className="flex justify-end space-x-4 pt-4">
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     onClick={() => setShowNewProject(false)}
                     disabled={loading}
                   >
                     Cancel
                   </Button>
-                  <Button 
-                    className="btn-cyber" 
+                  <Button
+                    className="btn-cyber"
                     onClick={handleCreateProject}
                     disabled={loading}
                   >
@@ -489,7 +490,7 @@ const Dashboard = () => {
         )}
 
         {/* Projects Grid */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
@@ -510,7 +511,7 @@ const Dashboard = () => {
                       <p className="text-sm text-muted-foreground mb-3">
                         {project.description || "No description"}
                       </p>
-                      <Badge 
+                      <Badge
                         variant={project.status === 'published' ? 'default' : project.status === 'generated' ? 'secondary' : 'outline'}
                         className="text-xs"
                       >
@@ -519,35 +520,35 @@ const Dashboard = () => {
                     </div>
                   </div>
                 </CardHeader>
-                
+
                 <CardContent>
                   <div className="flex flex-wrap gap-2 mb-4">
-                    <Button 
-                      size="sm" 
+                    <Button
+                      size="sm"
                       className="btn-cyber"
                       onClick={() => handleEdit(project)}
                     >
                       <Edit className="w-4 h-4 mr-1" />
                       Edit
                     </Button>
-                    <Button 
-                      size="sm" 
+                    <Button
+                      size="sm"
                       variant="outline"
                       onClick={() => handlePreview(project)}
                     >
                       <Eye className="w-4 h-4 mr-1" />
                       Preview
                     </Button>
-                    <Button 
-                      size="sm" 
+                    <Button
+                      size="sm"
                       variant="outline"
                       onClick={() => handleDownload(project)}
                     >
                       <Download className="w-4 h-4 mr-1" />
                       Download
                     </Button>
-                    <Button 
-                      size="sm" 
+                    <Button
+                      size="sm"
                       variant="outline"
                       onClick={() => handleDelete(project)}
                       className="text-destructive hover:text-destructive"
@@ -555,7 +556,7 @@ const Dashboard = () => {
                       Delete
                     </Button>
                   </div>
-                  
+
                   <div className="text-xs text-muted-foreground">
                     Created {new Date(project.created_at).toLocaleDateString()}
                   </div>
@@ -584,9 +585,9 @@ const Dashboard = () => {
           </motion.div>
         )}
 
-        <AuthModal 
-          isOpen={showAuthModal} 
-          onClose={() => setShowAuthModal(false)} 
+        <AuthModal
+          isOpen={showAuthModal}
+          onClose={() => setShowAuthModal(false)}
         />
       </div>
     </div>
