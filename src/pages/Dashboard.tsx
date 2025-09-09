@@ -145,8 +145,7 @@ const Dashboard = () => {
         const { data: response, error: aiError } = await supabase.functions.invoke('generate-code', {
           body: {
             prompt: `Create a modern, professional ${newProject.name}. ${newProject.description ? `Description: ${newProject.description}. ` : ''}Requirements: ${newProject.prompt}`,
-            projectType: 'landing page',
-            dualPhase: false
+            projectType: 'landing page'
           }
         });
 
@@ -189,7 +188,7 @@ const Dashboard = () => {
           html_content: aiResponse.html_content,
           css_content: aiResponse.css_content || '',
           js_content: aiResponse.js_content || '',
-          status: 'generated',
+          status: 'draft',
           user_id: user.id
         })
         .select()
