@@ -234,3 +234,20 @@ export type ExtendedPricingSpec = {
   plans: PricingPlan[];
   note?: string; // IVA, disclaimers
 };
+
+// Additional types for extended testimonials functionality
+export type TestimonialItem = {
+  uid: string;
+  quote: string;
+  author: string;
+  role?: string;
+  avatarUrl?: string;
+};
+
+export type ExtendedTestimonialsSpec = {
+  kind: "testimonials";
+  uid: string;
+  heading?: string;
+  items: TestimonialItem[];
+  autoplay?: { ms: number; pauseOnFocus?: boolean };
+};
