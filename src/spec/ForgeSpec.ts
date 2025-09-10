@@ -263,3 +263,20 @@ export type ExtendedFAQSpec = {
   allowMultipleOpen?: boolean;
   structuredData?: boolean; // schema.org FAQPage
 };
+
+// Additional types for extended gallery functionality
+export type GalleryItem = {
+  uid: string;
+  src: string;
+  alt: string;
+  caption?: string;
+  parallax?: { speed: number };
+};
+
+export type GallerySpec = {
+  kind: "gallery";
+  uid: string;
+  heading?: string;
+  items: GalleryItem[];
+  layout?: "masonry" | "grid";
+};
