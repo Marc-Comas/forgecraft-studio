@@ -283,6 +283,106 @@ IMPORTANT: Return ONLY the JSON object, no markdown formatting or additional tex
   }
 });
 
+// supabase/functions/generate-code/index.ts
+import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
+
+type PatchOp =
+  | { type: "replace_inner_html"; selector: string; html: string }
+  | { type: "replace_outer_html"; selector: string; html: string }
+  | { type: "append_child" | "prepend_child" | "insert_before" | "insert_after"; selector: string; html: string }
+  | { type: "set_attribute"; selector: string; name: string; value: string }
+  | { type: "remove"; selector: string }
+  | { type: "replace_text"; selector: string; text: string };
+
+type Body = { prompt: string; code?: string; mode?: "patch" | "doc" | "health" };
+
+const json = (obj: unknown, status = 200) => new Response(JSON.stringify(obj), {
+  status,
+  headers: {
+    "Content-Type": "application/json",
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Headers": "authorization, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+  },
+});
+
+function extractJson(raw: string): any | null { try { return JSON.parse(raw); } catch { return null; } }
+
+serve(async (req) => {
+  if (req.method === "OPTIONS") return json({}, 200);
+
+  let body: Body;
+  try { body = await req.json(); } catch { return json({ error: "Invalid JSON body" }, 400); }
+
+  if (body.mode === "health") return json({ content: "<!doctype html><html><body><main>health-ok</main></body></html>" });
+
+  const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY") || "";
+  const OPENAI_MODEL = Deno.env.get("PLANNER_MODEL") || Deno.env.get("OPENAI_MODEL") || "gpt-4.1";
+  if (!OPENAI_API_KEY) return json({ error: "OpenAI API key is not configured" }, 500);
+
+  const wantsPatch = body.mode !== "doc";
+  const system = wantsPatch
+    ? [
+        "You output ONLY JSON {\"patches\": PatchOp[]}. No markdown, no code fences, no commentary.",
+        "Allowed PatchOp: replace_inner_html, replace_outer_html, append_child, prepend_child, insert_before, insert_after, set_attribute, remove, replace_text.",
+        "Do NOT rewrite the whole document. Target specific sections using robust selectors (prefer [data-uid]).",
+        "When user asks for imagery or video, include <img> or <video> with remote sources (Unsplash/Picsum/CDN mp4).",
+        "Enrich new/edited elements with utility classes (e.g., hero, card, btn) and add attributes data-anim (e.g., fade-up) and data-parallax='0.3' where relevant.",
+        "Never include <script> tags; the client runtime will handle animations and parallax.",
+      ].join("\n")
+    : [
+        "Generate a complete landing HTML. Return ONLY JSON {\"html_content\":\"<!doctype html>...\"}. No fences, no commentary.",
+        "Use accessible markup and include <img>/<video> where appropriate with remote sources.",
+      ].join("\n");
+
+  const user = wantsPatch
+    ? `Apply minimal DOM edits to current HTML:
+CURRENT_HTML_START
+${(body.code||"").slice(0,6000)}
+CURRENT_HTML_END
+INSTRUCTION: ${body.prompt}`
+    : `INSTRUCTION: ${body.prompt}`;
+
+  const payload = {
+    model: OPENAI_MODEL,
+    temperature: 0.2,
+    max_tokens: wantsPatch ? 3200 : 3600,
+    messages: [
+      { role: "system", content: system },
+      { role: "user", content: user }
+    ]
+  };
+
+  try {
+    const r = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const txt = await r.text();
+    if (!r.ok) return json({ error: `OpenAI ${r.status}: ${txt.slice(0,300)}` }, 502);
+
+    let content: string | null = null;
+    try { content = JSON.parse(txt)?.choices?.[0]?.message?.content ?? null; } catch { content = txt; }
+    if (!content) return json({ error: "Empty model response" }, 500);
+
+    const obj = extractJson(content);
+    if (wantsPatch) {
+      if (obj?.patches && Array.isArray(obj.patches)) return json({ patches: obj.patches });
+      if (content.includes("<!--PARTIAL_HTML_START-->")) return json({ content: content });
+      return json({ patches: [] });
+    } else {
+      if (obj?.html_content || obj?.content) return json({ html_content: obj.html_content || obj.content });
+      if (content.trim().startsWith("<")) return json({ html_content: content.trim() });
+      return json({ error: "Invalid model output" }, 500);
+    }
+  } catch (e) {
+    return json({ error: `Network error: ${String(e).slice(0,200)}` }, 500);
+  }
+});
+
+
+
 // Dual-phase generation function
 async function handleDualPhaseGeneration(prompt: string, projectType: string, apiKey: string) {
   const startTime = Date.now();
