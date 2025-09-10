@@ -226,21 +226,24 @@ const Editor = () => {
       let intent;
       
       if (isExistingCode) {
-        // For existing code: minimal context + strict output contract
-        enhancedPrompt = `STRICT CONTRACT: Return ONLY valid HTML in html_content field. NO markdown, NO explanations, NO external links.
+        // For existing code: focus on surgical changes
+        enhancedPrompt = `CRITICAL: Make ONLY the specific changes requested. DO NOT rewrite the entire page.
 
 CHANGE REQUEST: ${aiPrompt}
 
-CURRENT CODE (first 800 chars): ${code.substring(0, 800)}${code.length > 800 ? '...' : ''}
+CURRENT CODE: ${code}
 
-RULES:
-- Keep existing assets/HEAD unchanged unless requested
-- Make MINIMAL changes to fulfill request
-- If partial response, wrap in <!--PARTIAL_HTML_START--> ... <!--PARTIAL_HTML_END-->
-- Return complete valid HTML document`;
+STRICT RULES:
+- Make MINIMAL surgical changes only
+- Keep ALL existing structure, styles, and content unchanged except what's specifically requested
+- If changing text: only change the specific text mentioned
+- If changing styles: only modify the specific CSS/classes mentioned  
+- If adding elements: insert them in the appropriate location without affecting other elements
+- Return the COMPLETE modified HTML document with minimal changes
+- NO markdown, NO explanations, NO external links`;
         
-        projectType = 'enhancement';
-        intent = 'enhancement';
+        projectType = 'targeted_modification';
+        intent = 'surgical_edit';
       } else {
         // For new projects: use dual-phase with clear instructions
         enhancedPrompt = `STRICT CONTRACT: Generate landing page using dual-phase. Return ONLY html_content field.
