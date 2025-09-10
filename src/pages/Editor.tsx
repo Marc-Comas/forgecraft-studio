@@ -5,13 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { 
-  Code2, 
-  Eye, 
-  Save, 
-  Download, 
-  Undo, 
-  Redo, 
+import {
+  Code2,
+  Eye,
+  Save,
+  Download,
+  Undo,
+  Redo,
   Settings,
   Play,
   Palette,
@@ -49,8 +49,6 @@ const Editor = () => {
   const [user, setUser] = useState<User | null>(null);
   const [initialLoading, setInitialLoading] = useState(true);
   const [generationPhase, setGenerationPhase] = useState<string>('');
-  const [codeHistory, setCodeHistory] = useState<string[]>([]);
-  const [canRevert, setCanRevert] = useState(false);
 
   useEffect(() => {
     const checkUserAndLoadProject = async () => {
@@ -67,7 +65,7 @@ const Editor = () => {
       if (projectId) {
         await loadProject(projectId, user.id);
       }
-      
+
       setInitialLoading(false);
     };
 
@@ -90,8 +88,6 @@ const Editor = () => {
         status: data.status as 'draft' | 'published' | 'archived' | 'generated'
       });
       setCode(data.html_content || '');
-      setCodeHistory([data.html_content || '']);
-      setCanRevert(false);
     } catch (error: any) {
       toast({
         title: "Error",
@@ -130,63 +126,6 @@ const Editor = () => {
     }
   };
 
-  const saveCodeToDatabase = async (codeToSave: string, showToast = true) => {
-    if (!project || !user) return false;
-
-    try {
-      const { error } = await supabase
-        .from('projects')
-        .update({ html_content: codeToSave })
-        .eq('id', project.id)
-        .eq('user_id', user.id);
-
-      if (error) throw error;
-
-      if (showToast) {
-        toast({
-          title: "Auto-saved!",
-          description: "AI changes have been saved automatically.",
-        });
-      }
-      return true;
-    } catch (error: any) {
-      if (showToast) {
-        toast({
-          title: "Error",
-          description: "Failed to auto-save AI changes",
-          variant: "destructive"
-        });
-      }
-      return false;
-    }
-  };
-
-  const addToHistory = (newCode: string) => {
-    setCodeHistory(prev => {
-      const newHistory = [...prev, newCode];
-      // Keep only last 10 versions to avoid memory issues  
-      return newHistory.slice(-10);
-    });
-    setCanRevert(true);
-  };
-
-  const revertLastChange = async () => {
-    if (codeHistory.length < 2) return;
-    
-    const previousCode = codeHistory[codeHistory.length - 2];
-    setCode(previousCode);
-    setCodeHistory(prev => prev.slice(0, -1));
-    setCanRevert(codeHistory.length > 2);
-    
-    // Auto-save the reverted code
-    await saveCodeToDatabase(previousCode, false);
-    
-    toast({
-      title: "Reverted!",
-      description: "Last AI change has been reverted successfully.",
-    });
-  };
-
   const handlePreview = () => {
     setActiveTab('preview');
   };
@@ -202,87 +141,33 @@ const Editor = () => {
     }
 
     setIsAiProcessing(true);
-    const isExistingCode = code.trim().length > 0;
-    
-    if (isExistingCode) {
-      setGenerationPhase('Making targeted changes to existing code...');
-    } else {
-      setGenerationPhase('Iniciando generación dual...');
-    }
-    
+    setGenerationPhase('Iniciando generación dual...');
+
     try {
-      console.log('🎯 Starting AI with prompt:', aiPrompt);
-      
-      if (!isExistingCode) {
-        toast({
-          title: "Generación Dual Iniciada",
-          description: "Fase 1: Generando estructura HTML + CSS (10K tokens)",
-        });
-      }
+      console.log('🎯 Starting AI enhancement with prompt:', aiPrompt);
 
-      // Build minimal, token-aware prompt
-      let enhancedPrompt;
-      let projectType;
-      let intent;
-      
-      if (isExistingCode) {
-        // For existing code: focus on surgical changes
-        enhancedPrompt = `CRITICAL: Make ONLY the specific changes requested. DO NOT rewrite the entire page.
+      toast({
+        title: "Generación Dual Iniciada",
+        description: "Fase 1: Generando estructura HTML + CSS (10K tokens)",
+      });
 
-CHANGE REQUEST: ${aiPrompt}
-
-CURRENT CODE: ${code}
-
-STRICT RULES:
-- Make MINIMAL surgical changes only
-- Keep ALL existing structure, styles, and content unchanged except what's specifically requested
-- If changing text: only change the specific text mentioned
-- If changing styles: only modify the specific CSS/classes mentioned  
-- If adding elements: insert them in the appropriate location without affecting other elements
-- Return the COMPLETE modified HTML document with minimal changes
-- NO markdown, NO explanations, NO external links`;
-        
-        projectType = 'targeted_modification';
-        intent = 'surgical_edit';
-      } else {
-        // For new projects: use dual-phase with clear instructions
-        enhancedPrompt = `STRICT CONTRACT: Generate landing page using dual-phase. Return ONLY html_content field.
-
-PROJECT REQUEST: ${aiPrompt}
-
-PHASE 1: HTML structure + CSS styling (10K tokens max)
-PHASE 2: JavaScript interactivity (5K tokens max)
-
-RULES:
-- NO markdown, NO code fences, NO explanations
-- Return complete valid HTML document
-- Include all CSS in <style> tags, all JS in <script> tags`;
-        
-        projectType = 'landing page';
-        intent = 'code';
-      }
-
-      // Simulate phase updates for UX
-      const phaseUpdateInterval = !isExistingCode ? setInterval(() => {
+      // Simulate phase updates for better UX
+      const phaseUpdateInterval = setInterval(() => {
         setGenerationPhase(prev => {
           if (prev.includes('estructura')) return 'Fase 2: Añadiendo interactividad JavaScript (5K tokens)...';
           if (prev.includes('interactividad')) return 'Finalizando y optimizando código...';
           return 'Generando estructura HTML + CSS...';
         });
-      }, 8000) : null;
+      }, 8000);
 
-      // Call the AI generation function
-      const { data: aiResponse, error: aiError } = await supabase.functions.invoke('generate-code', {
-        body: {
-          prompt: enhancedPrompt,
-          projectType,
-          intent,
-          code: isExistingCode ? code.substring(0, 1000) : undefined,
-          dualPhase: !isExistingCode // Only use dual-phase for new projects
-        }
-      });
+      // Call the AI generation function with dual-phase enabled
+      const isEdit = !!code.trim();
+const payload = isEdit
+  ? { prompt: buildPatchPrompt(aiPrompt || "Refine header styles and layout only."), code: (code || "").slice(0, 6000), mode: "patch", dualPhase: false }
+  : { prompt: aiPrompt, mode: "doc" };
+const { data: aiResponse, error: aiError } = await supabase.functions.invoke('generate-code', { body: payload });
 
-      if (phaseUpdateInterval) clearInterval(phaseUpdateInterval);
+      clearInterval(phaseUpdateInterval);
       setGenerationPhase('');
 
       console.log('📥 AI Response received:', { aiResponse, aiError });
@@ -296,53 +181,33 @@ RULES:
         throw new Error(aiResponse.error);
       }
 
-      // Handle both html_content and legacy content fields
-      let generatedContent = aiResponse.html_content || aiResponse.content;
-      
-      if (!generatedContent) {
-        throw new Error('No content received from AI');
+      // Update the code with AI-generated content
+      if (aiResponse?.patches && Array.isArray(aiResponse.patches)) {
+        const merged = applyPatches(code, aiResponse.patches as PatchOp[]);
+        setCode(merged);
+      } else if (typeof aiResponse?.content === "string" && aiResponse.content.includes("<!--PARTIAL_HTML_START-->")) {
+        const fragment = aiResponse.content.split("<!--PARTIAL_HTML_START-->")[1]?.split("<!--PARTIAL_HTML_END-->")[0] || "";
+        const merged = replaceMainOrSection(code, fragment);
+        setCode(merged);
+      } else if (aiResponse?.html_content || aiResponse?.content) {
+        const generatedContent = (aiResponse.html_content || aiResponse.content) as string;
+        setCode(ensureDataUids(generatedContent));
+      } else {
+        console.warn("AI returned no applicable changes:", aiResponse);
       }
-
-      // Handle partial HTML replacement for existing code
-      if (isExistingCode && generatedContent.includes('<!--PARTIAL_HTML_START-->')) {
-        const partialMatch = generatedContent.match(/<!--PARTIAL_HTML_START-->([\s\S]*?)<!--PARTIAL_HTML_END-->/);
-        if (partialMatch) {
-          const partialContent = partialMatch[1].trim();
-          // Simple replacement strategy: replace <main> content or insert before </body>
-          if (code.includes('<main>')) {
-            generatedContent = code.replace(/<main[\s\S]*?<\/main>/i, `<main>${partialContent}</main>`);
-          } else if (code.includes('</body>')) {
-            generatedContent = code.replace('</body>', `${partialContent}\n</body>`);
-          } else {
-            generatedContent = partialContent; // Fallback to partial content
-          }
-        }
-      }
-
-      // Save current code to history before making changes
-      addToHistory(code);
-
-      setCode(generatedContent);
       setAiPrompt('');
-      
-      // Auto-save the AI-generated code
-      await saveCodeToDatabase(generatedContent);
-      
+
       // Show success message based on generation mode
-      const successTitle = isExistingCode ? 
-        'Code Updated' : 
-        aiResponse.mode === 'dual_phase_complete' ? 
-        'Generación Dual Completada' : 
-        aiResponse.mode === 'dual_phase_fallback' ? 
+      const successTitle = aiResponse.mode === 'dual_phase_complete' ?
+        'Generación Dual Completada' :
+        aiResponse.mode === 'dual_phase_fallback' ?
         'Generación Parcial Completada' :
-        'AI Generation Complete';
-      
-      const successDescription = aiResponse.messages ? 
+        'AI Enhancement Complete';
+
+      const successDescription = aiResponse.messages ?
         aiResponse.messages.join(' • ') :
-        isExistingCode ? 
-        'Your code has been updated with the requested changes!' :
-        'Your landing page has been generated successfully!';
-      
+        'Your code has been updated with AI-generated improvements!';
+
       toast({
         title: successTitle,
         description: successDescription,
@@ -362,7 +227,7 @@ RULES:
 
   const handleDownload = () => {
     if (!project) return;
-    
+
     const blob = new Blob([code], { type: 'text/html' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -372,7 +237,7 @@ RULES:
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    
+
     toast({
       title: "Downloaded!",
       description: `${project.name} has been downloaded.`,
@@ -409,7 +274,7 @@ RULES:
     <div className="min-h-screen bg-background">
       <div className="flex flex-col h-screen">
         {/* Header */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           className="border-b border-border bg-card/30 backdrop-blur-sm"
@@ -417,9 +282,9 @@ RULES:
           <div className="container mx-auto px-6 py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-4">
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={() => navigate('/dashboard')}
                 >
                   <ArrowLeft className="w-4 h-4 mr-2" />
@@ -436,19 +301,9 @@ RULES:
               </div>
 
               <div className="flex items-center space-x-2">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={revertLastChange}
-                  disabled={!canRevert}
-                  title="Revert last AI change"
-                >
-                  <Undo className="w-4 h-4 mr-2" />
-                  Revert
-                </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={handleSave}
                   disabled={saving}
                 >
@@ -500,7 +355,7 @@ RULES:
         <div className="flex-1 flex">
           {/* Code Editor */}
           {activeTab === 'code' && (
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               className="flex-1 p-6"
@@ -518,7 +373,7 @@ RULES:
 
           {/* Preview */}
           {activeTab === 'preview' && (
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               className="flex-1 p-6"
@@ -543,7 +398,7 @@ RULES:
 
           {/* AI Assistant */}
           {activeTab === 'ai' && (
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               className="flex-1 p-6"
@@ -554,9 +409,6 @@ RULES:
                     <Sparkles className="w-5 h-5 mr-2 text-primary" />
                     AI Code Assistant
                   </CardTitle>
-                  <p className="text-sm text-muted-foreground">
-                    Changes are automatically saved. Use "Revert" button to undo last AI change.
-                  </p>
                 </CardHeader>
                 <CardContent className="space-y-6">
                   <div>
@@ -570,7 +422,7 @@ RULES:
                       onChange={(e) => setAiPrompt(e.target.value)}
                     />
                   </div>
-                  
+
                   {generationPhase && (
                     <div className="mb-4 p-3 bg-primary/10 border border-primary/20 rounded-lg">
                       <div className="flex items-center space-x-2 text-sm">
@@ -579,8 +431,8 @@ RULES:
                       </div>
                     </div>
                   )}
-                  
-                  <Button 
+
+                  <Button
                     className="btn-cyber w-full"
                     onClick={handleAiEdit}
                     disabled={isAiProcessing}
@@ -593,7 +445,7 @@ RULES:
                     ) : (
                       <>
                         <Sparkles className="w-4 h-4 mr-2" />
-                        {code.trim() ? 'Apply Changes (Single-Phase)' : 'Generate New (Dual-Phase AI)'}
+                        {code.trim() ? 'Apply AI Changes' : 'Generate with Dual AI (15K tokens)'}
                       </>
                     )}
                   </Button>
@@ -601,39 +453,19 @@ RULES:
                   <div className="border-t border-border pt-6">
                     <h3 className="font-semibold mb-4">Quick Actions</h3>
                     <div className="grid grid-cols-2 gap-3">
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="justify-start"
-                        onClick={() => setAiPrompt('Change the color scheme to use modern gradients')}
-                      >
+                      <Button variant="outline" size="sm" className="justify-start">
                         <Palette className="w-4 h-4 mr-2" />
                         Change Colors
                       </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="justify-start"
-                        onClick={() => setAiPrompt('Add a contact form section with validation')}
-                      >
+                      <Button variant="outline" size="sm" className="justify-start">
                         <Settings className="w-4 h-4 mr-2" />
                         Add Components
                       </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="justify-start"
-                        onClick={() => setAiPrompt('Optimize for mobile devices and improve responsive design')}
-                      >
+                      <Button variant="outline" size="sm" className="justify-start">
                         <Monitor className="w-4 h-4 mr-2" />
                         Make Responsive
                       </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="justify-start"
-                        onClick={() => setAiPrompt('Add smooth scroll animations and hover effects')}
-                      >
+                      <Button variant="outline" size="sm" className="justify-start">
                         <Play className="w-4 h-4 mr-2" />
                         Add Animations
                       </Button>
@@ -650,3 +482,130 @@ RULES:
 };
 
 export default Editor;
+// --- PatchOps helpers (injected) ---
+type PatchOp =
+  | { type: "replace_inner_html"; selector: string; html: string }
+  | { type: "replace_outer_html"; selector: string; html: string }
+  | { type: "append_child"; selector: string; html: string }
+  | { type: "prepend_child"; selector: string; html: string }
+  | { type: "insert_before"; selector: string; html: string }
+  | { type: "insert_after"; selector: string; html: string }
+  | { type: "set_attribute"; selector: string; name: string; value: string }
+  | { type: "remove"; selector: string }
+  | { type: "replace_text"; selector: string; text: string };
+
+function buildPatchPrompt(instruction: string) {
+  return [
+    "Apply minimal, targeted DOM edits to the existing HTML.",
+    "Return ONLY JSON as {\"patches\":[...]}. No markdown, no code fences, no explanations.",
+    "Use stable selectors. Prefer existing [data-uid] markers if present; otherwise #ids/roles.",
+    "Allowed ops: replace_inner_html | replace_outer_html | append_child | prepend_child | insert_before | insert_after | set_attribute | remove | replace_text.",
+    `REQUESTED CHANGE: ${instruction}`,
+  ].join("\\n");
+}
+
+function ensureDataUids(html: string) {
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html || "<!doctype html><html><body><main></main></body></html>", "text/html");
+    const sections = Array.from(doc.querySelectorAll("header, main, section, footer"));
+    let changed = false;
+    for (const el of sections) {
+      if (!el.getAttribute("data-uid")) {
+        el.setAttribute("data-uid", `sec-${Math.random().toString(36).slice(2, 8)}`);
+        changed = true;
+      }
+    }
+    return changed ? "<!doctype html>" + doc.documentElement.outerHTML : html;
+  } catch {
+    return html;
+  }
+}
+
+function applyPatches(html: string, ops: PatchOp[]) {
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, "text/html");
+    const apply = (op: PatchOp) => {
+      const nodes = Array.from(doc.querySelectorAll((op as any).selector || ""));
+      if (!nodes.length) return;
+      switch (op.type) {
+        case "replace_inner_html":
+          nodes.forEach(n => (n.innerHTML = (op as any).html || ""));
+          break;
+        case "replace_outer_html":
+          nodes.forEach(n => {
+            const tmp = doc.createElement("div");
+            tmp.innerHTML = (op as any).html || "";
+            const newNode = tmp.firstElementChild;
+            if (newNode && n.parentNode) n.parentNode.replaceChild(newNode, n);
+          });
+          break;
+        case "append_child":
+          nodes.forEach(n => n.insertAdjacentHTML("beforeend", (op as any).html || ""));
+          break;
+        case "prepend_child":
+          nodes.forEach(n => n.insertAdjacentHTML("afterbegin", (op as any).html || ""));
+          break;
+        case "insert_before":
+          nodes.forEach(n => n.insertAdjacentHTML("beforebegin", (op as any).html || ""));
+          break;
+        case "insert_after":
+          nodes.forEach(n => n.insertAdjacentHTML("afterend", (op as any).html || ""));
+          break;
+        case "set_attribute":
+          nodes.forEach(n => n.setAttribute((op as any).name, (op as any).value));
+          break;
+        case "remove":
+          nodes.forEach(n => n.remove());
+          break;
+        case "replace_text":
+          nodes.forEach(n => (n.textContent = (op as any).text || ""));
+          break;
+      }
+    };
+    ops.forEach(apply);
+    normalizeStyles(doc);
+    return "<!doctype html>" + doc.documentElement.outerHTML;
+  } catch {
+    return html;
+  }
+}
+
+function replaceMainOrSection(fullHtml: string, fragment: string) {
+  try {
+    const uidMatch = fragment.match(/data-uid="([^"]+)"/);
+    if (uidMatch) {
+      const uid = uidMatch[1];
+      return fullHtml.replace(new RegExp(`(<[^>]+data-uid="${uid}"[^>]*>)([\\s\\S]*?)(</[^>]+>)`, "i"), `$1${fragment}$3`);
+    }
+    // fallback: replace main content
+    return fullHtml.replace(/(<main[\\s\\S]*?>)([\\s\\S]*?)(<\\/main>)/i, `$1${fragment}$3`);
+  } catch {
+    return fullHtml;
+  }
+}
+
+// Ensure key sections have baseline classes if missing (prevents "unstyled header" issue)
+function normalizeStyles(doc: Document) {
+  // Header baseline
+  const headers = Array.from(doc.querySelectorAll("header"));
+  headers.forEach(h => {
+    const cls = h.getAttribute("class") || "";
+    if (!cls || cls.trim().length < 4) {
+      h.setAttribute("class", "sticky top-0 z-50 backdrop-blur bg-black/40 border-b border-white/10");
+    }
+  });
+  // Nav links baseline
+  const navs = Array.from(doc.querySelectorAll("nav"));
+  navs.forEach(n => {
+    const links = Array.from(n.querySelectorAll("a"));
+    links.forEach(a => {
+      const c = a.getAttribute("class") || "";
+      if (!/px-/.test(c)) {
+        a.setAttribute("class", (c ? c + " " : "") + "px-3 py-2 rounded hover:bg-white/10 transition");
+      }
+    });
+  });
+}
+
