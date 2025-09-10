@@ -304,3 +304,13 @@ export type HeaderSpec = {
   sticky?: boolean;
   transparentUntilScroll?: boolean;
 };
+
+// Additional types for extended CTA band functionality
+export type CTABandSpec = {
+  kind: "cta-band";
+  uid: string;
+  heading: string;
+  subcopy?: string;
+  cta: { label: string; href?: string; style?: "primary" | "ghost" };
+  motion?: { entrance?: "fade-up" };
+};
