@@ -5,6 +5,7 @@ import FAQ from "./FAQ";
 import Gallery from "./Gallery";
 import Footer from "./Footer";
 import Header from "./Header";
+import CTABand from "./CTABand";
 
 export const renderMap = {
   features: Features,
@@ -14,4 +15,5 @@ export const renderMap = {
   gallery: Gallery,
   footer: Footer,
   header: Header,
+  "cta-band": CTABand,
 };
