@@ -292,3 +292,15 @@ export type ExtendedFooterSpec = {
   socials?: { platform: "x" | "linkedin" | "github" | "instagram"; href: string }[];
   newsletter?: { enabled: boolean; placeholder?: string; submitLabel?: string; endpoint?: string };
 };
+
+// Additional types for extended header functionality
+export type NavItem = { uid: string; label: string; href: string };
+export type HeaderSpec = {
+  kind: "header";
+  uid: string;
+  brand?: { label: string; href?: string; logoUrl?: string };
+  items: NavItem[];
+  cta?: { label: string; href?: string };
+  sticky?: boolean;
+  transparentUntilScroll?: boolean;
+};
