@@ -53,23 +53,26 @@ const Header: React.FC<HeaderProps> = ({ spec }) => {
   }, [isMenuOpen]);
 
   const headerClasses = cn(
-    "w-full transition-all duration-300 ease-in-out z-50",
+    "w-full transition-all duration-500 ease-in-out z-50",
     spec.sticky ? "fixed top-0" : "relative",
     spec.transparentUntilScroll 
       ? isScrolled 
-        ? "bg-background/95 backdrop-blur-md border-b border-border shadow-sm" 
-        : "bg-transparent"
-      : "bg-background border-b border-border"
+        ? "bg-background/95 backdrop-blur-xl border-b border-primary/20 shadow-lg cyber-glow" 
+        : "bg-gradient-to-r from-background/5 via-background/10 to-background/5 backdrop-blur-sm"
+      : "bg-gradient-dark border-b border-primary/30 cyber-glow"
   );
 
   const brandClasses = cn(
-    "flex items-center space-x-2 transition-colors duration-200",
-    spec.transparentUntilScroll && !isScrolled ? "text-foreground" : "text-foreground"
+    "flex items-center space-x-3 transition-all duration-300 hover-lift",
+    spec.transparentUntilScroll && !isScrolled ? "text-gradient-primary" : "text-gradient-primary"
   );
 
   const navClasses = cn(
-    "transition-colors duration-200",
-    spec.transparentUntilScroll && !isScrolled ? "text-foreground/80" : "text-muted-foreground"
+    "transition-all duration-300 font-medium relative group",
+    "text-foreground/80 hover:text-primary",
+    "after:content-[''] after:absolute after:w-0 after:h-0.5 after:bottom-0 after:left-0",
+    "after:bg-gradient-primary after:transition-all after:duration-300",
+    "hover:after:w-full hover:scale-105"
   );
 
   return (
@@ -83,39 +86,41 @@ const Header: React.FC<HeaderProps> = ({ spec }) => {
       </a>
 
       <div className="container mx-auto px-4">
-        <div className="flex items-center justify-between h-16">
+        <div className="flex items-center justify-between h-20">
           {/* Brand */}
           <div className={brandClasses}>
             {spec.brand && (
               <a
                 href={spec.brand.href || "/"}
-                className="flex items-center space-x-2 hover:opacity-80 transition-opacity"
+                className="flex items-center space-x-3 hover:scale-110 transition-all duration-300 group"
                 {...getSafeLinkProps(spec.brand.href || "/")}
               >
                 {spec.brand.logoUrl && (
-                  <img
-                    src={spec.brand.logoUrl}
-                    alt={spec.brand.label || "Logo"}
-                    className="h-8 w-auto"
-                  />
+                  <div className="relative p-2 bg-gradient-primary rounded-xl hover-glow">
+                    <img
+                      src={spec.brand.logoUrl}
+                      alt={spec.brand.label || "Logo"}
+                      className="h-10 w-auto filter brightness-0 invert"
+                    />
+                  </div>
                 )}
                 {spec.brand.label && (
-                  <span className="font-semibold text-lg">{spec.brand.label}</span>
+                  <span className="font-display font-bold text-2xl text-gradient-primary group-hover:scale-105 transition-transform duration-300">
+                    {spec.brand.label}
+                  </span>
                 )}
               </a>
             )}
           </div>
 
           {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center space-x-8">
-            {spec.items.map((item) => (
+          <nav className="hidden md:flex items-center space-x-10">
+            {spec.items.map((item, index) => (
               <a
                 key={item.uid}
                 href={item.href}
-                className={cn(
-                  navClasses,
-                  "hover:text-foreground transition-colors font-medium"
-                )}
+                className={navClasses}
+                style={{ animationDelay: `${index * 0.1}s` }}
                 {...getSafeLinkProps(item.href)}
               >
                 {item.label}
@@ -127,18 +132,13 @@ const Header: React.FC<HeaderProps> = ({ spec }) => {
           <div className="flex items-center space-x-4">
             {/* Desktop CTA */}
             {spec.cta && (
-              <Button
-                asChild
-                className="hidden md:inline-flex"
-                variant="default"
+              <a
+                href={spec.cta.href || "#"}
+                className="hidden md:inline-flex btn-cyber animate-pulse-glow hover-lift"
+                {...getSafeLinkProps(spec.cta.href || "#")}
               >
-                <a
-                  href={spec.cta.href || "#"}
-                  {...getSafeLinkProps(spec.cta.href || "#")}
-                >
-                  {spec.cta.label}
-                </a>
-              </Button>
+                {spec.cta.label}
+              </a>
             )}
 
             {/* Mobile Menu */}
@@ -147,17 +147,20 @@ const Header: React.FC<HeaderProps> = ({ spec }) => {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="md:hidden"
+                  className="md:hidden p-3 bg-gradient-primary/10 border border-primary/30 hover:bg-gradient-primary hover:text-primary-foreground transition-all duration-300 hover-glow"
                   aria-expanded={isMenuOpen}
                   aria-controls="mobile-menu"
                   aria-label="Toggle navigation menu"
                 >
-                  {isMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+                  {isMenuOpen ? 
+                    <X className="h-6 w-6 text-primary" /> : 
+                    <Menu className="h-6 w-6 text-primary" />
+                  }
                 </Button>
               </SheetTrigger>
-              <SheetContent side="right" className="w-[300px] sm:w-[400px]">
-                <SheetHeader>
-                  <SheetTitle className="text-left">
+              <SheetContent side="right" className="w-[320px] sm:w-[420px] bg-gradient-dark border-l border-primary/30 backdrop-blur-xl">
+                <SheetHeader className="pb-6">
+                  <SheetTitle className="text-left text-2xl font-display text-gradient-primary">
                     {spec.brand?.label || "Navigation"}
                   </SheetTitle>
                 </SheetHeader>
@@ -165,37 +168,36 @@ const Header: React.FC<HeaderProps> = ({ spec }) => {
                 <div 
                   ref={menuRef}
                   id="mobile-menu"
-                  className="flex flex-col space-y-4 mt-8"
+                  className="flex flex-col space-y-6 mt-8"
                 >
                   {/* Mobile Navigation Links */}
-                  {spec.items.map((item) => (
+                  {spec.items.map((item, index) => (
                     <a
                       key={item.uid}
                       href={item.href}
-                      className="text-lg font-medium text-foreground hover:text-primary transition-colors py-2"
+                      className="text-xl font-medium text-foreground/80 hover:text-primary transition-all duration-300 py-3 px-4 rounded-lg hover:bg-primary/10 border border-transparent hover:border-primary/30 hover-lift group animate-slide-up"
+                      style={{ animationDelay: `${index * 0.1}s` }}
                       onClick={() => setIsMenuOpen(false)}
                       {...getSafeLinkProps(item.href)}
                     >
-                      {item.label}
+                      <span className="relative">
+                        {item.label}
+                        <span className="absolute inset-x-0 -bottom-1 h-0.5 bg-gradient-primary scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"></span>
+                      </span>
                     </a>
                   ))}
                   
                   {/* Mobile CTA */}
                   {spec.cta && (
-                    <div className="pt-4 border-t border-border">
-                      <Button
-                        asChild
-                        className="w-full"
-                        variant="default"
+                    <div className="pt-6 border-t border-primary/20">
+                      <a
+                        href={spec.cta.href || "#"}
+                        className="btn-cyber w-full text-center block animate-pulse-glow hover-lift"
+                        onClick={() => setIsMenuOpen(false)}
+                        {...getSafeLinkProps(spec.cta.href || "#")}
                       >
-                        <a
-                          href={spec.cta.href || "#"}
-                          onClick={() => setIsMenuOpen(false)}
-                          {...getSafeLinkProps(spec.cta.href || "#")}
-                        >
-                          {spec.cta.label}
-                        </a>
-                      </Button>
+                        {spec.cta.label}
+                      </a>
                     </div>
                   )}
                 </div>
