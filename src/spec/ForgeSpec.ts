@@ -251,3 +251,15 @@ export type ExtendedTestimonialsSpec = {
   items: TestimonialItem[];
   autoplay?: { ms: number; pauseOnFocus?: boolean };
 };
+
+// Additional types for extended FAQ functionality
+export type FAQItem = { uid: string; q: string; a: string };
+
+export type ExtendedFAQSpec = {
+  kind: "faq";
+  uid: string;
+  heading?: string;
+  items: FAQItem[];
+  allowMultipleOpen?: boolean;
+  structuredData?: boolean; // schema.org FAQPage
+};
