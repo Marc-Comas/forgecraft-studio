@@ -212,3 +212,25 @@ export type FAQSpec = z.infer<typeof FAQSpecSchema>;
 export type FooterSpec = z.infer<typeof FooterSpecSchema>;
 export type SectionSpec = z.infer<typeof SectionSpecSchema>;
 export type PageSpec = z.infer<typeof PageSpecSchema>;
+
+// Additional types for extended pricing functionality
+export type PricingPlan = {
+  uid: string;
+  name: string;
+  monthly: number;
+  yearly: number;
+  currency?: "EUR" | "USD" | "GBP";
+  highlight?: boolean;
+  features: string[];
+  cta?: { label: string; href?: string };
+};
+
+export type ExtendedPricingSpec = {
+  kind: "pricing";
+  uid: string;
+  heading?: string;
+  subcopy?: string;
+  toggle?: { default: "monthly" | "yearly" };
+  plans: PricingPlan[];
+  note?: string; // IVA, disclaimers
+};
