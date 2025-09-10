@@ -49,6 +49,8 @@ const Editor = () => {
   const [user, setUser] = useState<User | null>(null);
   const [initialLoading, setInitialLoading] = useState(true);
   const [generationPhase, setGenerationPhase] = useState<string>('');
+  const [codeHistory, setCodeHistory] = useState<string[]>([]);
+  const [canRevert, setCanRevert] = useState(false);
 
   useEffect(() => {
     const checkUserAndLoadProject = async () => {
@@ -88,6 +90,8 @@ const Editor = () => {
         status: data.status as 'draft' | 'published' | 'archived' | 'generated'
       });
       setCode(data.html_content || '');
+      setCodeHistory([data.html_content || '']);
+      setCanRevert(false);
     } catch (error: any) {
       toast({
         title: "Error",
@@ -124,6 +128,63 @@ const Editor = () => {
     } finally {
       setSaving(false);
     }
+  };
+
+  const saveCodeToDatabase = async (codeToSave: string, showToast = true) => {
+    if (!project || !user) return false;
+
+    try {
+      const { error } = await supabase
+        .from('projects')
+        .update({ html_content: codeToSave })
+        .eq('id', project.id)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      if (showToast) {
+        toast({
+          title: "Auto-saved!",
+          description: "AI changes have been saved automatically.",
+        });
+      }
+      return true;
+    } catch (error: any) {
+      if (showToast) {
+        toast({
+          title: "Error",
+          description: "Failed to auto-save AI changes",
+          variant: "destructive"
+        });
+      }
+      return false;
+    }
+  };
+
+  const addToHistory = (newCode: string) => {
+    setCodeHistory(prev => {
+      const newHistory = [...prev, newCode];
+      // Keep only last 10 versions to avoid memory issues  
+      return newHistory.slice(-10);
+    });
+    setCanRevert(true);
+  };
+
+  const revertLastChange = async () => {
+    if (codeHistory.length < 2) return;
+    
+    const previousCode = codeHistory[codeHistory.length - 2];
+    setCode(previousCode);
+    setCodeHistory(prev => prev.slice(0, -1));
+    setCanRevert(codeHistory.length > 2);
+    
+    // Auto-save the reverted code
+    await saveCodeToDatabase(previousCode, false);
+    
+    toast({
+      title: "Reverted!",
+      description: "Last AI change has been reverted successfully.",
+    });
   };
 
   const handlePreview = () => {
@@ -255,8 +316,14 @@ RULES:
         }
       }
 
+      // Save current code to history before making changes
+      addToHistory(code);
+
       setCode(generatedContent);
       setAiPrompt('');
+      
+      // Auto-save the AI-generated code
+      await saveCodeToDatabase(generatedContent);
       
       // Show success message based on generation mode
       const successTitle = isExistingCode ? 
@@ -369,6 +436,16 @@ RULES:
                 <Button 
                   variant="outline" 
                   size="sm" 
+                  onClick={revertLastChange}
+                  disabled={!canRevert}
+                  title="Revert last AI change"
+                >
+                  <Undo className="w-4 h-4 mr-2" />
+                  Revert
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
                   onClick={handleSave}
                   disabled={saving}
                 >
@@ -474,6 +551,9 @@ RULES:
                     <Sparkles className="w-5 h-5 mr-2 text-primary" />
                     AI Code Assistant
                   </CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    Changes are automatically saved. Use "Revert" button to undo last AI change.
+                  </p>
                 </CardHeader>
                 <CardContent className="space-y-6">
                   <div>
