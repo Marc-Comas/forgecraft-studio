@@ -280,3 +280,15 @@ export type GallerySpec = {
   items: GalleryItem[];
   layout?: "masonry" | "grid";
 };
+
+// Additional types for extended footer functionality
+export type FooterLink = { uid: string; label: string; href: string };
+export type FooterColumn = { uid: string; heading: string; links: FooterLink[] };
+
+export type ExtendedFooterSpec = {
+  kind: "footer";
+  uid: string;
+  columns: FooterColumn[];
+  socials?: { platform: "x" | "linkedin" | "github" | "instagram"; href: string }[];
+  newsletter?: { enabled: boolean; placeholder?: string; submitLabel?: string; endpoint?: string };
+};
