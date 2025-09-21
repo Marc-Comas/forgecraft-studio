@@ -1,4 +1,4 @@
-name: Apply QA Boot (robust v3)
+name: Apply QA Boot (robust v4)
 on:
   workflow_dispatch: {}
 
@@ -21,13 +21,7 @@ jobs:
       - name: Ensure folders
         run: |
           set -e
-          mkdir -p .github/workflows
-          mkdir -p .github
-          mkdir -p tests/unit
-          mkdir -p tests/a11y
-          mkdir -p tests/e2e
-
-      # ---- ARCHIVOS (1 heredoc por paso) ----
+          mkdir -p .github/workflows .github tests/unit tests/a11y tests/e2e
 
       - name: Write CI workflow
         run: |
@@ -143,18 +137,18 @@ jobs:
           EOF
 
       - name: Write CODEOWNERS
-        run: |
-          echo "* @Marc-Comas" > CODEOWNERS
+        run: echo "* @Marc-Comas" > CODEOWNERS
 
+      # ⚠️ Paso problemático REEMPLAZADO por printf (sin heredoc)
       - name: Write vitest.config.ts (only if missing)
+        shell: bash
         run: |
           if [ ! -f vitest.config.ts ]; then
-            cat > vitest.config.ts <<'EOF'
-            import { defineConfig } from 'vitest/config';
-            export default defineConfig({
-              test: { environment: 'jsdom', setupFiles: ['./tests/setup-tests.ts'] }
-            });
-            EOF
+            printf "%s\n" \
+"import { defineConfig } from 'vitest/config';" \
+"export default defineConfig({" \
+"  test: { environment: 'jsdom', setupFiles: ['./tests/setup-tests.ts'] }" \
+"});" > vitest.config.ts
           fi
 
       - name: Write tests/setup-tests.ts
