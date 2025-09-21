@@ -2,11 +2,23 @@
 // scripts/apply-qa-boot.mjs
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 
 const ROOT = process.cwd();
-const writeMode = process.argv.includes("--write");
-const reviewMode = process.argv.includes("--review") || !writeMode;
+const WRITE = process.argv.includes("--write");
+const REVIEW = !WRITE || process.argv.includes("--review");
+
+function abs(p) { return path.join(ROOT, p); }
+function exists(p) { return fs.existsSync(p); }
+function readJSON(p) { return JSON.parse(fs.readFileSync(p, "utf8")); }
+function ensureDirForFile(absFilePath) {
+  const dir = path.dirname(absFilePath);
+  fs.mkdirSync(dir, { recursive: true });
+}
+function writeFileRel(relPath, content) {
+  const target = abs(relPath);
+  ensureDirForFile(target);
+  fs.writeFileSync(target, content, "utf8");
+}
 
 const files = {
   ".github/workflows/ci.yml": `name: CI
@@ -52,7 +64,7 @@ jobs:
   "quality": { "coverage_min": 0.8, "lighthouse_min": 0.9, "axe_critical_violations": 0 }
 }
 `,
-  ".env.example": `# Env de ejemplo (no subir .env reales)
+  ".env.example": `# Env de ejemplo (no subas .env reales)
 VITE_SUPABASE_URL=
 VITE_SUPABASE_ANON_KEY=
 `,
@@ -91,7 +103,7 @@ trim_trailing_whitespace = true
 - [ ] Typecheck sin errores
 - [ ] Documentación/README actualizada
 
-## Screenshots o evidencias
+## Evidencias
 `,
   "CODEOWNERS": `* @Marc-Comas
 `,
@@ -126,19 +138,10 @@ describe('A11y smoke', () => {
 
 export default defineConfig({
   testDir: './tests/e2e',
-  timeout: 30_000,
-  use: {
-    baseURL: 'http://localhost:4173',
-    trace: 'on-first-retry'
-  },
-  webServer: {
-    command: 'npm run preview',
-    url: 'http://localhost:4173',
-    reuseExistingServer: !process.env.CI
-  },
-  projects: [
-    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
-  ]
+  timeout: 30000,
+  use: { baseURL: 'http://localhost:4173', trace: 'on-first-retry' },
+  webServer: { command: 'npm run preview', url: 'http://localhost:4173', reuseExistingServer: !process.env.CI },
+  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }]
 });
 `,
   "tests/e2e/smoke.spec.ts": `import { test, expect } from '@playwright/test';
@@ -157,123 +160,79 @@ test('ruta desconocida muestra 404 o fallback', async ({ page }) => {
 `
 };
 
-const ensureDir = (fp) => fs.mkdirSync(path.dirname(fp), { recursive: true });
-const exists = (p) => fs.existsSync(p);
-const readJSON = (p) => JSON.parse(fs.readFileSync(p, "utf8"));
-const writeFile = (fp, content) => {
-  ensureDir(path.join(ROOT, path.dirname(fp)));
-  fs.writeFileSync(path.join(ROOT, fp), content, "utf8");
-};
+const SUMMARY = { created: [], updated: [], warnings: [], nextDeps: [] };
 
-const summary = { created: [], updated: [], warnings: [], nextDeps: [] };
-
-// 1) Create or update files (non-destructive where applicable)
-for (const [rel, content] of Object.entries(files)) {
-  const fp = path.join(ROOT, rel);
-  if (!exists(fp)) {
-    if (!reviewMode) writeFile(rel, content);
-    summary.created.push(rel);
-  } else {
-    // Only overwrite safe scaffolds; skip if user already has content in those areas
-    const overwritable = [
-      ".github/workflows/ci.yml",
-      "lighthouserc.json",
-      "delivery.manifest.json",
-      ".env.example",
-      ".prettierrc",
-      ".stylelintrc.json",
-      ".editorconfig",
-      ".github/PULL_REQUEST_TEMPLATE.md",
-      "CODEOWNERS",
-      "tests/setup-tests.ts",
-      "tests/a11y/a11y.smoke.test.ts",
-      "playwright.config.ts",
-      "tests/e2e/smoke.spec.ts",
-      "vitest.config.ts"
-    ];
-    if (overwritable.includes(rel)) {
-      if (!reviewMode) writeFile(rel, content);
-      summary.updated.push(rel);
+try {
+  // 1) Escribir/actualizar archivos
+  const overwritable = new Set(Object.keys(files)); // todos son seguros aquí
+  for (const [rel, content] of Object.entries(files)) {
+    const target = abs(rel);
+    const existsNow = exists(target);
+    if (!existsNow) {
+      if (WRITE) writeFileRel(rel, content);
+      SUMMARY.created.push(rel);
+    } else if (overwritable.has(rel)) {
+      if (WRITE) writeFileRel(rel, content);
+      SUMMARY.updated.push(rel);
     }
   }
-}
 
-// 2) .gitignore → añade entradas sin duplicar
-const gitignorePath = path.join(ROOT, ".gitignore");
-const gitignoreAdds = ["node_modules", "dist", ".env", "playwright-report", "test-results", "lhci_reports"];
-let giContent = exists(gitignorePath) ? fs.readFileSync(gitignorePath, "utf8") : "";
-for (const line of gitignoreAdds) {
-  if (!giContent.split("\n").includes(line)) giContent += (giContent.endsWith("\n") ? "" : "\n") + line + "\n";
-}
-if (!reviewMode) writeFile(".gitignore", giContent);
-summary.updated.push(".gitignore");
+  // 2) .gitignore: añade entradas sin duplicar
+  const giPath = abs(".gitignore");
+  const adds = ["node_modules", "dist", ".env", "playwright-report", "test-results", "lhci_reports"];
+  let gi = exists(giPath) ? fs.readFileSync(giPath, "utf8") : "";
+  const set = new Set(gi.split("\n").filter(Boolean));
+  for (const line of adds) set.add(line);
+  const giOut = Array.from(set).join("\n") + "\n";
+  if (WRITE) writeFileRel(".gitignore", giOut);
+  SUMMARY.updated.push(".gitignore");
 
-// 3) package.json: merge scripts de forma segura
-const pkgPath = path.join(ROOT, "package.json");
-if (!exists(pkgPath)) {
-  summary.warnings.push("No se encontró package.json. Este repo no parece un proyecto Node.");
-} else {
-  const pkg = readJSON(pkgPath);
-  pkg.scripts ||= {};
-  const addScripts = {
-    "dev": pkg.scripts.dev || "vite",
-    "build": pkg.scripts.build || "vite build",
-    "preview": pkg.scripts.preview || "vite preview",
-    "test": pkg.scripts.test || "vitest run",
-    "test:watch": pkg.scripts["test:watch"] || "vitest",
-    "typecheck": pkg.scripts.typecheck || "tsc --noEmit",
-    "lint": pkg.scripts.lint || "eslint . --ext .ts,.tsx --max-warnings 0",
-    "format": pkg.scripts.format || "prettier --check .",
-    "format:write": pkg.scripts["format:write"] || "prettier --write .",
-    "a11y:check": pkg.scripts["a11y:check"] || "vitest run tests/a11y --reporter=dot",
-    "e2e": pkg.scripts.e2e || "playwright test",
-    "lhci": pkg.scripts.lhci || "lhci autorun"
-  };
-  const before = JSON.stringify(pkg.scripts);
-  Object.assign(pkg.scripts, addScripts);
-  const after = JSON.stringify(pkg.scripts);
-  if (before !== after) {
-    if (!reviewMode) fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + "\n", "utf8");
-    summary.updated.push("package.json (scripts)");
+  // 3) package.json: fusionar scripts
+  const pkgPath = abs("package.json");
+  if (!exists(pkgPath)) {
+    SUMMARY.warnings.push("No se encontró package.json. ¿Es un proyecto Node?");
+  } else {
+    const pkg = readJSON(pkgPath);
+    pkg.scripts ||= {};
+    const add = {
+      dev: pkg.scripts.dev || "vite",
+      build: pkg.scripts.build || "vite build",
+      preview: pkg.scripts.preview || "vite preview",
+      test: pkg.scripts.test || "vitest run",
+      "test:watch": pkg.scripts["test:watch"] || "vitest",
+      typecheck: pkg.scripts.typecheck || "tsc --noEmit",
+      lint: pkg.scripts.lint || "eslint . --ext .ts,.tsx --max-warnings 0",
+      format: pkg.scripts.format || "prettier --check .",
+      "format:write": pkg.scripts["format:write"] || "prettier --write .",
+      "a11y:check": pkg.scripts["a11y:check"] || "vitest run tests/a11y --reporter=dot",
+      e2e: pkg.scripts.e2e || "playwright test",
+      lhci: pkg.scripts.lhci || "lhci autorun"
+    };
+    const before = JSON.stringify(pkg.scripts);
+    Object.assign(pkg.scripts, add);
+    const after = JSON.stringify(pkg.scripts);
+    if (before !== after && WRITE) fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + "\n", "utf8");
+    if (before !== after) SUMMARY.updated.push("package.json (scripts)");
+
+    // Dev deps sugeridas
+    const suggested = [
+      "vitest","@testing-library/react","@testing-library/jest-dom","jest-axe","@types/jest-axe","jsdom",
+      "@playwright/test","playwright","@lhci/cli",
+      "prettier","stylelint","stylelint-config-standard","stylelint-config-prettier",
+      "eslint-plugin-jsx-a11y","wait-on"
+    ];
+    const current = Object.assign({}, pkg.devDependencies, pkg.dependencies);
+    const missing = suggested.filter(d => !current || !current[d]);
+    if (missing.length) SUMMARY.nextDeps = missing;
   }
 
-  // Dev dependencies sugeridas (solo las listamos; no instalamos)
-  const suggested = [
-    "vitest","@testing-library/react","@testing-library/jest-dom","jest-axe","@types/jest-axe","jsdom",
-    "@playwright/test","playwright","@lhci/cli",
-    "prettier","stylelint","stylelint-config-standard","stylelint-config-prettier",
-    "eslint-plugin-jsx-a11y","wait-on"
-  ];
-  const currentDeps = Object.assign({}, pkg.devDependencies, pkg.dependencies);
-  const missing = suggested.filter((d) => !currentDeps || !currentDeps[d]);
-  if (missing.length) summary.nextDeps = missing;
-}
+  // 4) Doble runner check
+  const hasVitest = exists(abs("vitest.config.ts")) || exists(abs("vitest.config.js"));
+  const hasJest = exists(abs("jest.config.ts")) || exists(abs("jest.config.js"));
+  if (hasVitest && hasJest) SUMMARY.warnings.push("Detectado Vitest y Jest. Mantén solo UNO (recomendado: Vitest).");
 
-// 4) Detect runner
-const hasVitestCfg = exists(path.join(ROOT, "vitest.config.ts")) || exists(path.join(ROOT, "vitest.config.js"));
-const hasJestCfg = exists(path.join(ROOT, "jest.config.ts")) || exists(path.join(ROOT, "jest.config.js"));
-if (hasVitestCfg && hasJestCfg) {
-  summary.warnings.push("Detectado Vitest y Jest. Mantén solo UNO para evitar conflictos.");
-}
+  // 5) .env en repo
+  if (exists(abs(".env"))) SUMMARY.warnings.push("Se detectó .env en el repo. Sube solo .env.example y usa GitHub Secrets. Rota claves.");
 
-// 5) .env warning
-if (exists(path.join(ROOT, ".env"))) {
-  summary.warnings.push("Se detectó .env en el repo. Sube solo .env.example y usa GitHub Secrets. Rota claves expuestas.");
-}
-
-// 6) Output resumen
-const banner = `
-Forgecraft QA Boot — ${reviewMode ? "REVIEW" : "WRITE"} MODE
------------------------------------------------------------`;
-console.log(banner);
-console.log("Archivos creados:", summary.created);
-console.log("Archivos actualizados:", summary.updated);
-if (summary.nextDeps.length) {
-  console.log("\nDependencias de desarrollo sugeridas (instala estas):\n",
-    "npm i -D " + summary.nextDeps.join(" "));
-}
-if (summary.warnings.length) {
-  console.log("\nAdvertencias:");
-  for (const w of summary.warnings) console.log(" -", w);
-}
-console.log("\nListo.");
+  // 6) Salida
+  const banne
