@@ -1,6 +1,6 @@
-name: Apply QA Boot (robust v3)
+name: Apply QA Boot (robust v5)
 on:
-  workflow_dispatch: {}
+  workflow_dispatch: {}   # ← asegura el botón "Run workflow" en la rama por defecto
 
 permissions:
   contents: write
@@ -21,194 +21,183 @@ jobs:
       - name: Ensure folders
         run: |
           set -e
-          mkdir -p .github/workflows
-          mkdir -p .github
-          mkdir -p tests/unit
-          mkdir -p tests/a11y
-          mkdir -p tests/e2e
+          mkdir -p .github/workflows .github tests/unit tests/a11y tests/e2e
 
-      # ---- ARCHIVOS (1 heredoc por paso) ----
+      # ---- FILES (todos escritos con printf; sin heredocs) ----
 
       - name: Write CI workflow
         run: |
-          cat > .github/workflows/ci.yml <<'EOF'
-          name: CI
-          on: [push, pull_request]
-          jobs:
-            ci:
-              runs-on: ubuntu-latest
-              steps:
-                - uses: actions/checkout@v4
-                - uses: actions/setup-node@v4
-                  with: { node-version: '20' }
-                - run: npm ci || npm i
-                - run: npm run lint
-                - run: npm run typecheck
-                - run: npm run test -- --coverage
-                - run: npm run a11y:check
-                - run: npm run build
-                - run: npm run lhci
-                - name: E2E
-                  run: |
-                    npx playwright install --with-deps
-                    npm run e2e -- --reporter=line
-          EOF
+          printf "%s\n" \
+          "name: CI" \
+          "on: [push, pull_request]" \
+          "jobs:" \
+          "  ci:" \
+          "    runs-on: ubuntu-latest" \
+          "    steps:" \
+          "      - uses: actions/checkout@v4" \
+          "      - uses: actions/setup-node@v4" \
+          "        with:" \
+          "          node-version: '20'" \
+          "      - run: npm ci || npm i" \
+          "      - run: npm run lint" \
+          "      - run: npm run typecheck" \
+          "      - run: npm run test -- --coverage" \
+          "      - run: npm run a11y:check" \
+          "      - run: npm run build" \
+          "      - run: npm run lhci" \
+          "      - name: E2E" \
+          "        run: |" \
+          "          npx playwright install --with-deps" \
+          "          npm run e2e -- --reporter=line" \
+          > .github/workflows/ci.yml
 
       - name: Write lighthouserc.json
         run: |
-          cat > lighthouserc.json <<'EOF'
-          {
-            "ci": {
-              "collect": { "staticDistDir": "dist" },
-              "assert": {
-                "assertions": {
-                  "categories:performance": ["error", { "minScore": 0.9 }],
-                  "interactive": ["error", { "maxNumericValue": 200, "aggregationMethod": "p75" }],
-                  "largest-contentful-paint": ["error", { "maxNumericValue": 2500, "aggregationMethod": "p75" }],
-                  "cumulative-layout-shift": ["error", { "maxNumericValue": 0.1, "aggregationMethod": "p75" }],
-                  "total-byte-weight": ["error", { "maxLength": 350000 }]
-                }
-              }
-            }
-          }
-          EOF
+          printf "%s\n" \
+          "{" \
+          '  "ci": {' \
+          '    "collect": { "staticDistDir": "dist" },' \
+          '    "assert": {' \
+          '      "assertions": {' \
+          '        "categories:performance": ["error", { "minScore": 0.9 }],' \
+          '        "interactive": ["error", { "maxNumericValue": 200, "aggregationMethod": "p75" }],' \
+          '        "largest-contentful-paint": ["error", { "maxNumericValue": 2500, "aggregationMethod": "p75" }],' \
+          '        "cumulative-layout-shift": ["error", { "maxNumericValue": 0.1, "aggregationMethod": "p75" }],' \
+          '        "total-byte-weight": ["error", { "maxLength": 350000 }]}' \
+          '    }' \
+          '  }' \
+          "}" > lighthouserc.json
 
       - name: Write delivery.manifest.json
         run: |
-          cat > delivery.manifest.json <<'EOF'
-          {
-            "name": "forgecraft-studio",
-            "stack": ["vite","react","ts"],
-            "routes": ["/","/generator","/projects"],
-            "env_required": ["VITE_SUPABASE_URL","VITE_SUPABASE_ANON_KEY"],
-            "scripts": ["dev","build","test","lint","e2e","lhci","format","typecheck","a11y:check"],
-            "quality": { "coverage_min": 0.8, "lighthouse_min": 0.9, "axe_critical_violations": 0 }
-          }
-          EOF
+          printf "%s\n" \
+          "{" \
+          '  "name": "forgecraft-studio",' \
+          '  "stack": ["vite","react","ts"],' \
+          '  "routes": ["/","/generator","/projects"],' \
+          '  "env_required": ["VITE_SUPABASE_URL","VITE_SUPABASE_ANON_KEY"],' \
+          '  "scripts": ["dev","build","test","lint","e2e","lhci","format","typecheck","a11y:check"],' \
+          '  "quality": { "coverage_min": 0.8, "lighthouse_min": 0.9, "axe_critical_violations": 0 }' \
+          "}" > delivery.manifest.json
 
       - name: Write .env.example
         run: |
-          cat > .env.example <<'EOF'
-          # Env de ejemplo (no subas .env reales)
-          VITE_SUPABASE_URL=
-          VITE_SUPABASE_ANON_KEY=
-          EOF
+          printf "%s\n" \
+          "# Env de ejemplo (no subas .env reales)" \
+          "VITE_SUPABASE_URL=" \
+          "VITE_SUPABASE_ANON_KEY=" \
+          > .env.example
 
       - name: Write .stylelintrc.json
         run: |
-          cat > .stylelintrc.json <<'EOF'
-          {
-            "extends": ["stylelint-config-standard", "stylelint-config-prettier"],
-            "rules": {
-              "selector-class-pattern": "^[a-z0-9\\-]+$",
-              "no-descending-specificity": null
-            }
-          }
-          EOF
+          printf "%s\n" \
+          "{" \
+          '  "extends": ["stylelint-config-standard", "stylelint-config-prettier"],' \
+          '  "rules": {' \
+          '    "selector-class-pattern": "^[a-z0-9\\-]+$", ' \
+          '    "no-descending-specificity": null' \
+          "  }" \
+          "}" > .stylelintrc.json
 
       - name: Write .prettierrc
         run: |
-          cat > .prettierrc <<'EOF'
-          { "singleQuote": true, "trailingComma": "all", "printWidth": 100, "semi": true }
-          EOF
+          printf "%s\n" \
+          '{ "singleQuote": true, "trailingComma": "all", "printWidth": 100, "semi": true }' \
+          > .prettierrc
 
       - name: Write .editorconfig
         run: |
-          cat > .editorconfig <<'EOF'
-          root = true
-          [*]
-          charset = utf-8
-          end_of_line = lf
-          indent_style = space
-          indent_size = 2
-          insert_final_newline = true
-          trim_trailing_whitespace = true
-          EOF
+          printf "%s\n" \
+          "root = true" \
+          "[*]" \
+          "charset = utf-8" \
+          "end_of_line = lf" \
+          "indent_style = space" \
+          "indent_size = 2" \
+          "insert_final_newline = true" \
+          "trim_trailing_whitespace = true" \
+          > .editorconfig
 
       - name: Write PR template
         run: |
-          cat > .github/PULL_REQUEST_TEMPLATE.md <<'EOF'
-          ## Descripción
-          - [ ] Cambios principales
-
-          ## Checklist de calidad
-          - [ ] Tests unitarios (coverage >= 80%)
-          - [ ] A11y (jest-axe sin críticos)
-          - [ ] E2E básicos verdes
-          - [ ] LHCI (perf >= 0.9, interactive p75 <= 200ms)
-          - [ ] Typecheck sin errores
-          - [ ] Documentación/README actualizada
-
-          ## Evidencias
-          EOF
+          printf "%s\n" \
+          "## Descripción" \
+          "- [ ] Cambios principales" \
+          "" \
+          "## Checklist de calidad" \
+          "- [ ] Tests unitarios (coverage >= 80%)" \
+          "- [ ] A11y (jest-axe sin críticos)" \
+          "- [ ] E2E básicos verdes" \
+          "- [ ] LHCI (perf >= 0.9, interactive p75 <= 200ms)" \
+          "- [ ] Typecheck sin errores" \
+          "- [ ] Documentación/README actualizada" \
+          "" \
+          "## Evidencias" \
+          > .github/PULL_REQUEST_TEMPLATE.md
 
       - name: Write CODEOWNERS
-        run: |
-          echo "* @Marc-Comas" > CODEOWNERS
+        run: echo "* @Marc-Comas" > CODEOWNERS
 
       - name: Write vitest.config.ts (only if missing)
         run: |
           if [ ! -f vitest.config.ts ]; then
-            cat > vitest.config.ts <<'EOF'
-            import { defineConfig } from 'vitest/config';
-            export default defineConfig({
-              test: { environment: 'jsdom', setupFiles: ['./tests/setup-tests.ts'] }
-            });
-            EOF
+            printf "%s\n" \
+            "import { defineConfig } from 'vitest/config';" \
+            "export default defineConfig({" \
+            "  test: { environment: 'jsdom', setupFiles: ['./tests/setup-tests.ts'] }" \
+            "});" > vitest.config.ts
           fi
 
       - name: Write tests/setup-tests.ts
         run: |
-          cat > tests/setup-tests.ts <<'EOF'
-          import '@testing-library/jest-dom';
-          EOF
+          printf "%s\n" "import '@testing-library/jest-dom';" > tests/setup-tests.ts
 
       - name: Write a11y smoke test
         run: |
-          cat > tests/a11y/a11y.smoke.test.ts <<'EOF'
-          import { describe, it, expect } from 'vitest';
-          import { render } from '@testing-library/react';
-          import { axe, toHaveNoViolations } from 'jest-axe';
-          import App from '../../src/App';
-          expect.extend(toHaveNoViolations);
-          describe('A11y smoke', () => {
-            it('App no tiene violaciones críticas', async () => {
-              const { container } = render(<App />);
-              const results = await axe(container);
-              const criticals = results.violations.filter(v => v.impact === 'critical');
-              expect(criticals).toHaveLength(0);
-            });
-          });
-          EOF
+          printf "%s\n" \
+          "import { describe, it, expect } from 'vitest';" \
+          "import { render } from '@testing-library/react';" \
+          "import { axe, toHaveNoViolations } from 'jest-axe';" \
+          "import App from '../../src/App';" \
+          "expect.extend(toHaveNoViolations);" \
+          "describe('A11y smoke', () => {" \
+          "  it('App no tiene violaciones críticas', async () => {" \
+          "    const { container } = render(<App />);" \
+          "    const results = await axe(container);" \
+          "    const criticals = results.violations.filter(v => v.impact === 'critical');" \
+          "    expect(criticals).toHaveLength(0);" \
+          "  });" \
+          "});" \
+          > tests/a11y/a11y.smoke.test.ts
 
       - name: Write playwright.config.ts
         run: |
-          cat > playwright.config.ts <<'EOF'
-          import { defineConfig, devices } from '@playwright/test';
-          export default defineConfig({
-            testDir: './tests/e2e',
-            timeout: 30000,
-            use: { baseURL: 'http://localhost:4173', trace: 'on-first-retry' },
-            webServer: { command: 'npm run preview', url: 'http://localhost:4173', reuseExistingServer: !process.env.CI },
-            projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }]
-          });
-          EOF
+          printf "%s\n" \
+          "import { defineConfig, devices } from '@playwright/test';" \
+          "export default defineConfig({" \
+          "  testDir: './tests/e2e'," \
+          "  timeout: 30000," \
+          "  use: { baseURL: 'http://localhost:4173', trace: 'on-first-retry' }," \
+          "  webServer: { command: 'npm run preview', url: 'http://localhost:4173', reuseExistingServer: !process.env.CI }," \
+          "  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }]" \
+          "});" \
+          > playwright.config.ts
 
       - name: Write e2e smoke test
         run: |
-          cat > tests/e2e/smoke.spec.ts <<'EOF'
-          import { test, expect } from '@playwright/test';
-          test('home carga y muestra título', async ({ page }) => {
-            await page.goto('/');
-            const title = page.locator('h1, [data-testid="title"], [role="heading"]');
-            await expect(title).toBeVisible();
-          });
-          test('ruta desconocida muestra 404 o fallback', async ({ page }) => {
-            await page.goto('/_noexiste_');
-            const fallback = page.locator('text=404').or(page.locator('[data-testid="not-found"]'));
-            await expect(fallback).toBeVisible({ timeout: 5000 });
-          });
-          EOF
+          printf "%s\n" \
+          "import { test, expect } from '@playwright/test';" \
+          "test('home carga y muestra título', async ({ page }) => {" \
+          "  await page.goto('/');" \
+          "  const title = page.locator('h1, [data-testid=\"title\"], [role=\"heading\"]');" \
+          "  await expect(title).toBeVisible();" \
+          "});" \
+          "test('ruta desconocida muestra 404 o fallback', async ({ page }) => {" \
+          "  await page.goto('/_noexiste_');" \
+          "  const fallback = page.locator('text=404').or(page.locator('[data-testid=\"not-found\"]'));" \
+          "  await expect(fallback).toBeVisible({ timeout: 5000 });" \
+          "});" \
+          > tests/e2e/smoke.spec.ts
 
       - name: Update .gitignore (idempotent)
         run: |
