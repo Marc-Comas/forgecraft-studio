@@ -1,9 +1,10 @@
 name: Apply QA Boot (robust v4)
 on:
-  workflow_dispatch: {}
+  workflow_dispatch: {}  # Botón "Run workflow"
 
 permissions:
   contents: write
+  @@ -13,21 +13,25 @@ jobs:
   pull-requests: write
 
 jobs:
