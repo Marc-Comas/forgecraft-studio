@@ -1,0 +1,46 @@
+name: Apply QA Boot
+on:
+  workflow_dispatch: {}   # Botón "Run workflow" manual
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  apply-qa-boot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # Ejecuta TU script para generar los archivos de CI/QA/tests
+      - name: Run QA Boot script
+        run: node scripts/apply-qa-boot.mjs --write
+
+      # Instala dev deps recomendadas para que la CI no falle al abrir el PR
+      - name: Install dev dependencies
+        run: |
+          npm i -D vitest @testing-library/react @testing-library/jest-dom jest-axe @types/jest-axe jsdom \
+            @playwright/test playwright @lhci/cli prettier stylelint stylelint-config-standard stylelint-config-prettier \
+            eslint-plugin-jsx-a11y wait-on
+
+      # Crea Pull Request con todos los cambios (archivos + package.json + lockfile)
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          commit-message: "chore: QA boot (CI, tests, a11y, e2e, lhci, manifest)"
+          branch: chore/qa-boot
+          title: "chore: QA boot (CI, tests, a11y, e2e, lhci, manifest)"
+          body: |
+            Este PR añade:
+            - CI con gates (lint, typecheck, unit+coverage, a11y, build, LHCI, e2e)
+            - lighthouserc.json (INP/LCP/CLS + budgets)
+            - tests unit/a11y/e2e y config Playwright
+            - delivery.manifest.json, .env.example, .editorconfig, .stylelintrc, PR template, CODEOWNERS
+            - Scripts añadidos a package.json
+          labels: enhancement, qa
