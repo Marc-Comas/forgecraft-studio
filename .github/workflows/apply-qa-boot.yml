@@ -1,6 +1,6 @@
-name: Apply QA Boot (no-node)
+name: Apply QA Boot (robust v3)
 on:
-  workflow_dispatch: {}   # Botón "Run workflow"
+  workflow_dispatch: {}
 
 permissions:
   contents: write
@@ -13,21 +13,25 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node
+      - name: Setup Node 20
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
-      - name: Write QA/CI scaffold (heredocs, idempotent)
-        shell: bash
+      - name: Ensure folders
         run: |
-          set -euo pipefail
+          set -e
+          mkdir -p .github/workflows
+          mkdir -p .github
+          mkdir -p tests/unit
+          mkdir -p tests/a11y
+          mkdir -p tests/e2e
 
-          # 1) Carpetas necesarias
-          mkdir -p .github/workflows tests/unit tests/a11y tests/e2e .github
+      # ---- ARCHIVOS (1 heredoc por paso) ----
 
-          # 2) Archivos (crea/actualiza siempre con contenido conocido)
-          cat <<'YAML' > .github/workflows/ci.yml
+      - name: Write CI workflow
+        run: |
+          cat > .github/workflows/ci.yml <<'EOF'
           name: CI
           on: [push, pull_request]
           jobs:
@@ -48,9 +52,11 @@ jobs:
                   run: |
                     npx playwright install --with-deps
                     npm run e2e -- --reporter=line
-          YAML
+          EOF
 
-          cat <<'JSON' > lighthouserc.json
+      - name: Write lighthouserc.json
+        run: |
+          cat > lighthouserc.json <<'EOF'
           {
             "ci": {
               "collect": { "staticDistDir": "dist" },
@@ -65,9 +71,11 @@ jobs:
               }
             }
           }
-          JSON
+          EOF
 
-          cat <<'JSON' > delivery.manifest.json
+      - name: Write delivery.manifest.json
+        run: |
+          cat > delivery.manifest.json <<'EOF'
           {
             "name": "forgecraft-studio",
             "stack": ["vite","react","ts"],
@@ -76,15 +84,19 @@ jobs:
             "scripts": ["dev","build","test","lint","e2e","lhci","format","typecheck","a11y:check"],
             "quality": { "coverage_min": 0.8, "lighthouse_min": 0.9, "axe_critical_violations": 0 }
           }
-          JSON
+          EOF
 
-          cat <<'ENV' > .env.example
+      - name: Write .env.example
+        run: |
+          cat > .env.example <<'EOF'
           # Env de ejemplo (no subas .env reales)
           VITE_SUPABASE_URL=
           VITE_SUPABASE_ANON_KEY=
-          ENV
+          EOF
 
-          cat <<'JSON' > .stylelintrc.json
+      - name: Write .stylelintrc.json
+        run: |
+          cat > .stylelintrc.json <<'EOF'
           {
             "extends": ["stylelint-config-standard", "stylelint-config-prettier"],
             "rules": {
@@ -92,13 +104,17 @@ jobs:
               "no-descending-specificity": null
             }
           }
-          JSON
+          EOF
 
-          cat <<'JSON' > .prettierrc
+      - name: Write .prettierrc
+        run: |
+          cat > .prettierrc <<'EOF'
           { "singleQuote": true, "trailingComma": "all", "printWidth": 100, "semi": true }
-          JSON
+          EOF
 
-          cat <<'ECONF' > .editorconfig
+      - name: Write .editorconfig
+        run: |
+          cat > .editorconfig <<'EOF'
           root = true
           [*]
           charset = utf-8
@@ -107,9 +123,11 @@ jobs:
           indent_size = 2
           insert_final_newline = true
           trim_trailing_whitespace = true
-          ECONF
+          EOF
 
-          cat <<'MD' > .github/PULL_REQUEST_TEMPLATE.md
+      - name: Write PR template
+        run: |
+          cat > .github/PULL_REQUEST_TEMPLATE.md <<'EOF'
           ## Descripción
           - [ ] Cambios principales
 
@@ -122,25 +140,32 @@ jobs:
           - [ ] Documentación/README actualizada
 
           ## Evidencias
-          MD
+          EOF
 
+      - name: Write CODEOWNERS
+        run: |
           echo "* @Marc-Comas" > CODEOWNERS
 
-          # vitest.config.ts solo si no existe
+      - name: Write vitest.config.ts (only if missing)
+        run: |
           if [ ! -f vitest.config.ts ]; then
-            cat <<'TS' > vitest.config.ts
+            cat > vitest.config.ts <<'EOF'
             import { defineConfig } from 'vitest/config';
             export default defineConfig({
               test: { environment: 'jsdom', setupFiles: ['./tests/setup-tests.ts'] }
             });
-            TS
+            EOF
           fi
 
-          cat <<'TS' > tests/setup-tests.ts
+      - name: Write tests/setup-tests.ts
+        run: |
+          cat > tests/setup-tests.ts <<'EOF'
           import '@testing-library/jest-dom';
-          TS
+          EOF
 
-          cat <<'TS' > tests/a11y/a11y.smoke.test.ts
+      - name: Write a11y smoke test
+        run: |
+          cat > tests/a11y/a11y.smoke.test.ts <<'EOF'
           import { describe, it, expect } from 'vitest';
           import { render } from '@testing-library/react';
           import { axe, toHaveNoViolations } from 'jest-axe';
@@ -154,9 +179,11 @@ jobs:
               expect(criticals).toHaveLength(0);
             });
           });
-          TS
+          EOF
 
-          cat <<'TS' > playwright.config.ts
+      - name: Write playwright.config.ts
+        run: |
+          cat > playwright.config.ts <<'EOF'
           import { defineConfig, devices } from '@playwright/test';
           export default defineConfig({
             testDir: './tests/e2e',
@@ -165,9 +192,11 @@ jobs:
             webServer: { command: 'npm run preview', url: 'http://localhost:4173', reuseExistingServer: !process.env.CI },
             projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }]
           });
-          TS
+          EOF
 
-          cat <<'TS' > tests/e2e/smoke.spec.ts
+      - name: Write e2e smoke test
+        run: |
+          cat > tests/e2e/smoke.spec.ts <<'EOF'
           import { test, expect } from '@playwright/test';
           test('home carga y muestra título', async ({ page }) => {
             await page.goto('/');
@@ -179,20 +208,21 @@ jobs:
             const fallback = page.locator('text=404').or(page.locator('[data-testid="not-found"]'));
             await expect(fallback).toBeVisible({ timeout: 5000 });
           });
-          TS
+          EOF
 
-          # 3) .gitignore (sin duplicados)
+      - name: Update .gitignore (idempotent)
+        run: |
           touch .gitignore
           for L in node_modules dist .env playwright-report test-results lhci_reports; do
             grep -qxF "$L" .gitignore || echo "$L" >> .gitignore
           done
 
       - name: Update package.json scripts with jq (idempotent)
-        shell: bash
         run: |
-          set -euo pipefail
+          set -e
+          sudo apt-get update -y >/dev/null
+          sudo apt-get install -y jq >/dev/null
           test -f package.json
-          sudo apt-get update -y && sudo apt-get install -y jq
           tmp=$(mktemp)
           jq '
             .scripts = (.scripts // {}) |
@@ -210,7 +240,7 @@ jobs:
             .scripts.lhci //= "lhci autorun"
           ' package.json > "$tmp" && mv "$tmp" package.json
 
-      - name: Install dev dependencies (lockfile incluido en el PR)
+      - name: Install dev dependencies (commit lockfile)
         run: |
           npm i -D vitest @testing-library/react @testing-library/jest-dom jest-axe @types/jest-axe jsdom \
             @playwright/test playwright @lhci/cli prettier stylelint stylelint-config-standard stylelint-config-prettier \
