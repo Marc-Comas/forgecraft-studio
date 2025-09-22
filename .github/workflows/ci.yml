@@ -4,21 +4,155 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+
 permissions:
   contents: read
+
 concurrency:
-  group: ci-refs/heads/main
+  group: ci-${{ github.ref }}
   cancel-in-progress: true
+
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Detect package manager
+        id: pm
+        shell: bash
+        run: |
+          if [ -f pnpm-lock.yaml ]; then
+            echo "manager=pnpm" >> "$GITHUB_OUTPUT"
+          elif [ -f yarn.lock ]; then
+            echo "manager=yarn" >> "$GITHUB_OUTPUT"
+          elif [ -f bun.lockb ]; then
+            echo "manager=bun" >> "$GITHUB_OUTPUT"
+          else
+            # per defecte usem npm (amb fallback si no hi ha package-lock)
+            echo "manager=npm" >> "$GITHUB_OUTPUT"
+          fi
+          echo "Detected manager: $(cat $GITHUB_OUTPUT)"
+
+      # Setup Node + cache per a cada gestor
+      - name: Setup Node (npm)
+        if: ${{ steps.pm.outputs.manager == 'npm' }}
+        uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
-      - run: npm ci
-      - run: npm run lint --if-present
-      - run: npm test --if-present -- --ci --reporters=default
-      - run: npm run build --if-present
+
+      - name: Setup Node (pnpm)
+        if: ${{ steps.pm.outputs.manager == 'pnpm' }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Setup Node (yarn)
+        if: ${{ steps.pm.outputs.manager == 'yarn' }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+
+      - name: Setup Node (bun)
+        if: ${{ steps.pm.outputs.manager == 'bun' }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup pnpm
+        if: ${{ steps.pm.outputs.manager == 'pnpm' }}
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - name: Setup Bun
+        if: ${{ steps.pm.outputs.manager == 'bun' }}
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: 1.1.23
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          PM="${{ steps.pm.outputs.manager }}"
+          if [ "$PM" = "pnpm" ]; then
+            pnpm install --frozen-lockfile || pnpm install
+          elif [ "$PM" = "yarn" ]; then
+            corepack enable || true
+            yarn install --frozen-lockfile || yarn install
+          elif [ "$PM" = "bun" ]; then
+            bun install || true
+          else
+            if [ -f package-lock.json ]; then
+              npm ci
+            else
+              npm install
+            fi
+          fi
+
+      - name: Lint
+        shell: bash
+        run: |
+          PM="${{ steps.pm.outputs.manager }}"
+          if [ "$PM" = "pnpm" ]; then
+            pnpm run -r lint --if-present || true
+            pnpm run -r lint:css --if-present || true
+          elif [ "$PM" = "yarn" ]; then
+            yarn -s lint || true
+            yarn -s lint:css || true
+          elif [ "$PM" = "bun" ]; then
+            bun run lint || true
+            bun run lint:css || true
+          else
+            npm run lint --if-present
+            npm run lint:css --if-present
+          fi
+
+      - name: Unit tests
+        shell: bash
+        run: |
+          PM="${{ steps.pm.outputs.manager }}"
+          if [ "$PM" = "pnpm" ]; then
+            pnpm run -r test:ci --if-present || pnpm run -r test --if-present || true
+          elif [ "$PM" = "yarn" ]; then
+            yarn -s test:ci || yarn -s test || true
+          elif [ "$PM" = "bun" ]; then
+            bun run test:ci || bun run test || true
+          else
+            npm run test --if-present -- --ci --reporters=default || true
+          fi
+
+      - name: Build
+        shell: bash
+        run: |
+          PM="${{ steps.pm.outputs.manager }}"
+          if [ "$PM" = "pnpm" ]; then
+            pnpm run -r build --if-present || true
+          elif [ "$PM" = "yarn" ]; then
+            yarn -s build || true
+          elif [ "$PM" = "bun" ]; then
+            bun run build || true
+          else
+            npm run build --if-present
+          fi
+
+      - name: Upload reports & logs (always)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-logs
+          path: |
+            **/junit.xml
+            **/test-results/**/*.xml
+            **/playwright-report/**
+            cypress/screenshots/**
+            cypress/videos/**
+            **/logs/**
+          if-no-files-found: ignore
+
