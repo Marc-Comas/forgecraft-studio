@@ -155,4 +155,3 @@ jobs:
             cypress/videos/**
             **/logs/**
           if-no-files-found: ignore
-
