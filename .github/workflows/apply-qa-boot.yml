@@ -5,6 +5,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  workflows: write
 
 concurrency:
   group: boot-${{ github.ref }}
@@ -13,6 +14,10 @@ concurrency:
 jobs:
   apply-qa-boot:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      workflows: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -69,6 +74,9 @@ jobs:
           }
           JSON
           git add .stylelintrc.json
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: add .stylelintrc.json for Stylelint 16"
+          fi
 
       - name: Ensure .gitignore and .env.example
         shell: bash
@@ -77,13 +85,14 @@ jobs:
           if ! grep -qE '(^|/)\.env$' .gitignore; then
             echo ".env" >> .gitignore
           fi
-
           if [ -f ".env" ] && [ ! -f ".env.example" ]; then
             cp .env .env.example
-            # Sanititza valors
             sed -i 's/=.*/=<set-in-ci>/' .env.example || true
           fi
           git add .gitignore .env.example || true
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: ignore .env and add .env.example"
+          fi
 
       - name: Create base CI workflow (lint+test+build)
         shell: bash
@@ -96,31 +105,40 @@ jobs:
               branches: [main]
             pull_request:
             workflow_dispatch:
-          permissions: { contents: read }
-          concurrency: { group: ci-${{ github.ref }}, cancel-in-progress: true }
+          permissions:
+            contents: read
+          concurrency:
+            group: ci-${{ github.ref }}
+            cancel-in-progress: true
           jobs:
             test:
               runs-on: ubuntu-latest
               steps:
                 - uses: actions/checkout@v4
                 - uses: actions/setup-node@v4
-                  with: { node-version: 20, cache: 'npm' }
+                  with:
+                    node-version: 20
+                    cache: npm
                 - run: npm ci
                 - run: npm run lint --if-present
                 - run: npm test --if-present -- --ci --reporters=default
                 - run: npm run build --if-present
           YAML
           git add .github/workflows/ci.yml
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: add base CI workflow"
+          fi
 
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v6
         with:
+          token: ${{ secrets.GITHUB_TOKEN }}
           branch: chore/qa-boot
           title: "chore: QA boot – fix stylelint conflict + base CI"
           commit-message: "chore: QA boot – fix stylelint conflict + base CI"
           body: |
             - Remove incompatible stylelint-config-prettier (<15) and pin stylelint@16 + stylelint-config-standard@39.
             - Add .stylelintrc.json compatible with Stylelint 16.
-            - Ensure .gitignore ignores .env and provide .env.example (seguretat).
+            - Ensure .gitignore ignores .env and provide .env.example.
             - Create base CI (Node 20, npm ci, lint/test/build).
           labels: qa, ci
