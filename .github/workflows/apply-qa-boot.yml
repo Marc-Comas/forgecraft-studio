@@ -13,6 +13,9 @@ concurrency:
 jobs:
   apply-qa-boot:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -50,11 +53,6 @@ jobs:
             wait-on@^8.0.0
 
           git add package.json package-lock.json || true
-          if ! git diff --cached --quiet; then
-            git config user.email "ci@users.noreply.github.com"
-            git config user.name "ci-bot"
-            git commit -m "chore: add QA dev deps (stylelint@16 + standard@39, remove stylelint-config-prettier)"
-          fi
 
       - name: Write .stylelintrc.json (compatible with stylelint 16)
         shell: bash
@@ -63,7 +61,7 @@ jobs:
           {
             "extends": ["stylelint-config-standard"],
             "rules": {
-              "selector-class-pattern": "^[a-z0-9\\-]+$",
+              "selector-class-pattern": "^[a-z0-9\-]+$",
               "no-descending-specificity": null
             }
           }
@@ -77,15 +75,14 @@ jobs:
           if ! grep -qE '(^|/)\.env$' .gitignore; then
             echo ".env" >> .gitignore
           fi
-
           if [ -f ".env" ] && [ ! -f ".env.example" ]; then
             cp .env .env.example
-            # Sanititza valors
             sed -i 's/=.*/=<set-in-ci>/' .env.example || true
           fi
           git add .gitignore .env.example || true
 
-      - name: Create base CI workflow (lint+test+build)
+      - name: Create base CI workflow (lint+test+build) — only when WORKFLOW_PAT is present
+        if: ${{ secrets.WORKFLOW_PAT != '' }}
         shell: bash
         run: |
           mkdir -p .github/workflows
@@ -96,15 +93,20 @@ jobs:
               branches: [main]
             pull_request:
             workflow_dispatch:
-          permissions: { contents: read }
-          concurrency: { group: ci-${{ github.ref }}, cancel-in-progress: true }
+          permissions:
+            contents: read
+          concurrency:
+            group: ci-${{ github.ref }}
+            cancel-in-progress: true
           jobs:
             test:
               runs-on: ubuntu-latest
               steps:
                 - uses: actions/checkout@v4
                 - uses: actions/setup-node@v4
-                  with: { node-version: 20, cache: 'npm' }
+                  with:
+                    node-version: 20
+                    cache: npm
                 - run: npm ci
                 - run: npm run lint --if-present
                 - run: npm test --if-present -- --ci --reporters=default
@@ -112,15 +114,66 @@ jobs:
           YAML
           git add .github/workflows/ci.yml
 
-      - name: Create Pull Request
+      - name: Provide ci.yml as artifact when no WORKFLOW_PAT
+        if: ${{ secrets.WORKFLOW_PAT == '' }}
+        shell: bash
+        run: |
+          mkdir -p out
+          cat > out/ci.yml <<'YAML'
+          name: ci
+          on:
+            push:
+              branches: [main]
+            pull_request:
+            workflow_dispatch:
+          permissions:
+            contents: read
+          concurrency:
+            group: ci-${{ github.ref }}
+            cancel-in-progress: true
+          jobs:
+            test:
+              runs-on: ubuntu-latest
+              steps:
+                - uses: actions/checkout@v4
+                - uses: actions/setup-node@v4
+                  with:
+                    node-version: 20
+                    cache: npm
+                - run: npm ci
+                - run: npm run lint --if-present
+                - run: npm test --if-present -- --ci --reporters=default
+                - run: npm run build --if-present
+          YAML
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ secrets.WORKFLOW_PAT == '' }}
+        with:
+          name: ci-workflow
+          path: out/ci.yml
+
+      - name: Create Pull Request (using PAT)
+        if: ${{ secrets.WORKFLOW_PAT != '' }}
         uses: peter-evans/create-pull-request@v6
         with:
+          token: ${{ secrets.WORKFLOW_PAT }}
           branch: chore/qa-boot
           title: "chore: QA boot – fix stylelint conflict + base CI"
           commit-message: "chore: QA boot – fix stylelint conflict + base CI"
           body: |
             - Remove incompatible stylelint-config-prettier (<15) and pin stylelint@16 + stylelint-config-standard@39.
             - Add .stylelintrc.json compatible with Stylelint 16.
-            - Ensure .gitignore ignores .env and provide .env.example (seguretat).
+            - Ensure .gitignore ignores .env and provide .env.example.
             - Create base CI (Node 20, npm ci, lint/test/build).
+          labels: qa, ci
+
+      - name: Create Pull Request (fallback with GITHUB_TOKEN)
+        if: ${{ secrets.WORKFLOW_PAT == '' }}
+        uses: peter-evans/create-pull-request@v6
+        with:
+          branch: chore/qa-boot
+          title: "chore: QA boot – deps + configs"
+          commit-message: "chore: QA boot – deps + configs"
+          body: |
+            ci.yml is attached as an artifact in this run. Add it manually or set WORKFLOW_PAT secret to allow auto-commit of workflow files.
           labels: qa, ci
