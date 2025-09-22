@@ -16,6 +16,9 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+    # Flag segur per gatejar passos segons si hi ha PAT
+    env:
+      HAS_WORKFLOW_PAT: ${{ secrets.WORKFLOW_PAT != '' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -82,7 +85,7 @@ jobs:
           git add .gitignore .env.example || true
 
       - name: Create base CI workflow (lint+test+build) — only when WORKFLOW_PAT is present
-        if: ${{ secrets.WORKFLOW_PAT != '' }}
+        if: ${{ env.HAS_WORKFLOW_PAT == 'true' }}
         shell: bash
         run: |
           mkdir -p .github/workflows
@@ -115,7 +118,7 @@ jobs:
           git add .github/workflows/ci.yml
 
       - name: Provide ci.yml as artifact when no WORKFLOW_PAT
-        if: ${{ secrets.WORKFLOW_PAT == '' }}
+        if: ${{ env.HAS_WORKFLOW_PAT != 'true' }}
         shell: bash
         run: |
           mkdir -p out
@@ -147,13 +150,13 @@ jobs:
           YAML
 
       - uses: actions/upload-artifact@v4
-        if: ${{ secrets.WORKFLOW_PAT == '' }}
+        if: ${{ env.HAS_WORKFLOW_PAT != 'true' }}
         with:
           name: ci-workflow
           path: out/ci.yml
 
       - name: Create Pull Request (using PAT)
-        if: ${{ secrets.WORKFLOW_PAT != '' }}
+        if: ${{ env.HAS_WORKFLOW_PAT == 'true' }}
         uses: peter-evans/create-pull-request@v6
         with:
           token: ${{ secrets.WORKFLOW_PAT }}
@@ -168,7 +171,7 @@ jobs:
           labels: qa, ci
 
       - name: Create Pull Request (fallback with GITHUB_TOKEN)
-        if: ${{ secrets.WORKFLOW_PAT == '' }}
+        if: ${{ env.HAS_WORKFLOW_PAT != 'true' }}
         uses: peter-evans/create-pull-request@v6
         with:
           branch: chore/qa-boot
